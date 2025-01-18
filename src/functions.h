@@ -5,15 +5,30 @@
 #pragma once
 #include "utils.h"
 
+// BinaryOperation is slightly complicated because it can be either a cell or a constant
+typedef enum OperandType {
+    OPERAND_CELL,
+    OPERAND_INT
+} OperandType;
+
+typedef struct Operand {
+    OperandType type;
+    union {
+        Cell cell;
+        int value;
+    } data;
+} Operand;
+
+typedef struct BinaryOp {
+    Operand first;
+    Operand second;
+} BinaryOp;
+
 typedef struct RangeFunction {
     Cell topLeft;
     Cell bottomRight;
 } RangeFunction;
 
-typedef struct BinaryOp {
-    Cell first;
-    Cell second;
-} BinaryOp;
 
 typedef enum FunctionType {
     CONSTANT,

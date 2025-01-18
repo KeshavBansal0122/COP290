@@ -12,10 +12,18 @@ typedef struct {
     int col;
 } Cell;
 
+typedef enum {
+    NO_ERROR,
+    DIVIDE_BY_ZERO,
+    DEPENDENCY_ERROR // depends on cell which has div by zero
+} CellError;
 
 typedef struct {
     Cell cell;
     int value;
+    /**
+     * Needs recalculation
+     */
     bool isDirty;
     /**
      * Cells that depend on this cell
@@ -26,4 +34,5 @@ typedef struct {
      */
     Vec dependencies;
     Function function;
+    CellError error;
 } CellData;

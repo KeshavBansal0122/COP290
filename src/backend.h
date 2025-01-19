@@ -18,7 +18,12 @@ void initBackend(int rows, int cols);
  */
 void updateViewport(Cell topLeft, Cell bottomRight);
 
-char* getCellValue(Cell cell);
+/**
+ * @param error out parameter for error handling
+ * @return The integer to displayed by the frontend. Not using an int
+ * to allow changing data types in the future
+ */
+char* getCellValue(Cell cell, CellError* error);
 
 char* getCellFormula(Cell cell);
 

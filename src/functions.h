@@ -38,7 +38,7 @@ typedef enum FunctionType {
     SUM_FUNCTION,
     STDEV_FUNCTION,
     SLEEP_FUNCTION,
-    PLUS_OP,
+    PLUS_OP, // Identity function can be written as A1+0
     MINUS_OP,
     MULTIPLY_OP,
     DIVIDE_OP

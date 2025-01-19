@@ -19,7 +19,7 @@ Vec newVec(const int capacity) {
 }
 
 void resize(Vec* vec) {
-
+    vec->capacity = vec->capacity == 0 ? 1 : vec->capacity;
     size_t newCapacity = vec->capacity * 2;
     void** newData = realloc(vec->data, sizeof(void*) * newCapacity);
     if (!newData) {

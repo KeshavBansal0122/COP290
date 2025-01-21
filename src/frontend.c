@@ -121,8 +121,8 @@ void runCommand(const char* command) {
         } else if (command[i] == ' ' || command[i] == '\0') {
             //Query
             CellError error;
-            auto a = getCellValue(cell, &error);
-            auto b = getCellFormula(cell);
+            char* a = getCellValue(cell, &error);
+            char* b = getCellFormula(cell);
 
             printf("Computed Cell Value: %s\n", a);
             printf("Entered Cell expression: %s\n", b);

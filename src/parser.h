@@ -11,7 +11,7 @@
  * @param cell The text format like A1
  * @return The cell object
  */
-Cell getCell(char* cell);
+Cell getCell(const char* cell);
 
 /**
  * @param cell

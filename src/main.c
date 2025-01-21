@@ -1,7 +1,8 @@
 #include <stdio.h>
 #include "backend.h"
+#include "frontend.h"
 
 int main(void) {
-    printf("Hello, World!\n");
+    initFrontend(100, 100);
     return 0;
 }

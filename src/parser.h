@@ -2,8 +2,7 @@
 // Created by paradocx on 1/18/25.
 
 #pragma once
-#include "utils.h"
-#include "functions.h"
+#include "structs.h"
 
 
 

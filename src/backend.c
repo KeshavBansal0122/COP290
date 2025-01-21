@@ -11,6 +11,7 @@ void updateViewport(Cell topLeft, Cell bottomRight) {
 }
 
 char * getCellValue(Cell cell, CellError *error) {
+    return "";
 }
 
 char* getCellFormula(Cell cell) {

@@ -1,9 +1,22 @@
 //
-// Created by paradocx on 1/19/25.
+// Created by paradocx on 1/18/25.
 //
-
 #pragma once
-#include "utils.h"
+#include<stdbool.h>
+
+#include "vec.h"
+
+typedef struct {
+    int row;
+    int col;
+} Cell;
+
+typedef enum {
+    NO_ERROR,
+    DIVIDE_BY_ZERO,
+    DEPENDENCY_ERROR // depends on cell which has div by zero
+} CellError;
+
 
 // BinaryOperation is slightly complicated because it can be either a cell or a constant
 typedef enum OperandType {
@@ -52,6 +65,25 @@ typedef struct Function {
         int value;                  // Used for SleepFunction, Constant
     } data;
 } Function;
+
+typedef struct {
+    Cell cell;
+    int value;
+    /**
+     * Needs recalculation
+     */
+    bool isDirty;
+    /**
+     * Cells that depend on this cell
+     */
+    Vec dependents;
+    /**
+     * Cells that this cell depends on
+     */
+    Vec dependencies;
+    Function function;
+    CellError error;
+} CellData;
 
 
 int minFunction(CellData** cells, RangeFunction rangeFunction);

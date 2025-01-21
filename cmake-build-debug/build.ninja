@@ -79,8 +79,8 @@ build CMakeFiles/COP290.dir/src/frontend.c.o: C_COMPILER__COP290_unscanned_Debug
   OBJECT_DIR = CMakeFiles/COP290.dir
   OBJECT_FILE_DIR = CMakeFiles/COP290.dir/src
 
-build CMakeFiles/COP290.dir/src/functions.c.o: C_COMPILER__COP290_unscanned_Debug /home/paradocx/Jetbrains/COP290/src/functions.c || cmake_object_order_depends_target_COP290
-  DEP_FILE = CMakeFiles/COP290.dir/src/functions.c.o.d
+build CMakeFiles/COP290.dir/src/structs.c.o: C_COMPILER__COP290_unscanned_Debug /home/paradocx/Jetbrains/COP290/src/structs.c || cmake_object_order_depends_target_COP290
+  DEP_FILE = CMakeFiles/COP290.dir/src/structs.c.o.d
   FLAGS = -g -fdiagnostics-color=always
   OBJECT_DIR = CMakeFiles/COP290.dir
   OBJECT_FILE_DIR = CMakeFiles/COP290.dir/src
@@ -93,7 +93,7 @@ build CMakeFiles/COP290.dir/src/functions.c.o: C_COMPILER__COP290_unscanned_Debu
 #############################################
 # Link the executable COP290
 
-build COP290: C_EXECUTABLE_LINKER__COP290_Debug CMakeFiles/COP290.dir/src/main.c.o CMakeFiles/COP290.dir/src/backend.c.o CMakeFiles/COP290.dir/src/vec.c.o CMakeFiles/COP290.dir/src/parser.c.o CMakeFiles/COP290.dir/src/frontend.c.o CMakeFiles/COP290.dir/src/functions.c.o
+build COP290: C_EXECUTABLE_LINKER__COP290_Debug CMakeFiles/COP290.dir/src/main.c.o CMakeFiles/COP290.dir/src/backend.c.o CMakeFiles/COP290.dir/src/vec.c.o CMakeFiles/COP290.dir/src/parser.c.o CMakeFiles/COP290.dir/src/frontend.c.o CMakeFiles/COP290.dir/src/structs.c.o
   FLAGS = -g
   OBJECT_DIR = CMakeFiles/COP290.dir
   POST_BUILD = :

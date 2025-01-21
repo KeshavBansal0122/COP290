@@ -15,9 +15,8 @@ typedef struct {
 /**
  * This is a vector which holds pointers to data
  * Do note that this does not "own" the data like a c++ vector
- * @param capacity default 0
  */
-Vec newVec(int capacity=0);
+Vec newVec(int capacity);
 
 void push(Vec* vec, void* data);
 

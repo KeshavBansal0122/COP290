@@ -4,6 +4,6 @@
 
 #include "parser.h"
 
-#include "utils.h"
+#include "structs.h"
 
 void parseRange(char* range);

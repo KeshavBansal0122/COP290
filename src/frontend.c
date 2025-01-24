@@ -20,6 +20,8 @@ int cellWidth = 10;
 
 Cell topLeft;
 
+char* getLine();
+
 char* numberToColumnHeader(int number) {
     char buffer[4]; // Temporary buffer for the result in reverse order
     int index = 0;
@@ -68,12 +70,13 @@ void print_board() {
 }
 
 /**
- * Moves all spaces to the end of the string
+ * Removes spaces from a string
  * @param string
+ * @return The string without the spaces, may allocate a new string. The old pointer is invalidated
  */
-void removeSpaces(char* string) {
+char* removeSpaces(char* string) {
     if (string == NULL) {
-        return;
+        return NULL;
     }
 
     int i = 0, j = 0;
@@ -83,10 +86,12 @@ void removeSpaces(char* string) {
         }
         i++;
     }
+    string[j] = '\0';
 
-    while (j < i) {
-        string[j++] = ' ';
+    if(j < i/2) { // realloc if we have a lot of spaces
+        string = realloc(string, (j+1) * sizeof(char));
     }
+    return string;
 }
 
 /**
@@ -98,6 +103,7 @@ void runCommand(const char* command) {
         //A cell expression
         size_t i =0;
         while (isalnum(command[i])) {i++;}
+        
         char cellAddress[i+1];
         strncpy(cellAddress, command, i);
         cellAddress[i] = '\0';
@@ -118,11 +124,11 @@ void runCommand(const char* command) {
             expression[l-i] = '\0';
 
             setCellValue(cell, expression);
-        } else if (command[i] == ' ' || command[i] == '\0') {
+        } else if (command[i] == '\0') {
             //Query
             CellError error;
-            auto a = getCellValue(cell, &error);
-            auto b = getCellFormula(cell);
+            char* a = getCellValue(cell, &error);
+            char* b = getCellFormula(cell);
 
             printf("Computed Cell Value: %s\n", a);
             printf("Entered Cell expression: %s\n", b);
@@ -133,7 +139,7 @@ void runCommand(const char* command) {
         }
     } else {
         //movement or quit
-        if (command[1] != '\0' && command[1] != ' ') {
+        if (command[1] != '\0') {
             printf("Unknown Command\n");
             return;
         }
@@ -165,21 +171,15 @@ void runCommand(const char* command) {
 
 }
 
-void runConsole() {
-    size_t length = 32;
-    char* buffer = malloc(length * sizeof(char));
-
+_Noreturn void runConsole() {
     while (true) {
         printf("> ");
-        size_t ret = getline(&buffer, &length, stdin);
-        if (ret <= 0) { // some kind of error
-            break;
-        }
-        if (ret == 1) {
+
+        char* buffer = getLine();
+        if (buffer[0] == '\0') {
             continue; // only enter
         }
-        buffer[ret-1] = '\0'; // ignore the last newLine character
-        removeSpaces(buffer);
+        buffer = removeSpaces(buffer);
         runCommand(buffer);
         print_board();
     }
@@ -192,4 +192,20 @@ void initFrontend(int row, int col) {
     topLeft.col = 1;
     print_board();
     runConsole();
+}
+
+char* getLine() {
+    size_t length = 16;
+    char* buffer = malloc(length * sizeof(char));
+    size_t i = 0;
+    int c;
+    while( ((c = getchar()) != EOF) && c != '\n') {
+        if (i >= length-1) {
+            length *= 2;
+            buffer = realloc(buffer, length * sizeof(char));
+        }
+        buffer[i++] = c;
+    }
+    buffer[i] = '\0';
+    return buffer;
 }

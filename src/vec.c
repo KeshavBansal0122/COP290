@@ -37,6 +37,14 @@ void push(Vec* vec, void* data) {
     vec->data[vec->size++] = data;
 }
 
+void* pop(Vec* vec) {
+    if (vec->size == 0) {
+        printf("Vector is empty\n");
+        exit(EXIT_FAILURE);
+    }
+    return vec->data[vec->size--];
+}
+
 void* get(const Vec* vec, size_t index) {
     if (index >= vec->size) {
         fprintf(stderr, "Index out of bounds: %lu\n", index);

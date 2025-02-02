@@ -23,7 +23,7 @@ void updateViewport(Cell topLeft, Cell bottomRight);
  * @return The integer to displayed by the frontend. Not using an int
  * to allow changing data types in the future
  */
-char* getCellValue(Cell cell, CellError* error);
+int getCellValue(Cell cell, CellError* error); // was char* previously, no need now
 
 char* getCellFormula(Cell cell);
 

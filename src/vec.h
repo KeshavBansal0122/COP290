@@ -20,6 +20,8 @@ Vec newVec(int capacity);
 
 void push(Vec* vec, void* data);
 
+void* pop(Vec* vec);
+
 void* get(const Vec* vec, size_t index);
 
 size_t getSize(const Vec* vec);

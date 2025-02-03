@@ -9,12 +9,16 @@
 #include <stdio.h>
 #include <string.h>
 #include <time.h>
-#include <minmax.h>
 
 #include "backend.h"
 #include "parser.h"
 
 #define MAX_WIDTH 10
+
+#define min(a,b) (((a) < (b)) ? (a) : (b))
+#define max(a,b) (((a) > (b)) ? (a) : (b))
+
+
 
 int rows;
 int cols;

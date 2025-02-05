@@ -1,10 +1,7 @@
 #include "backend.h"
+#include "parser.h"
 #include <stdlib.h>
 #include <string.h>
-
-//
-// NEEDS CHANGES, NOT DONE
-//
 
 // Global variables to store the spreadsheet data and its dimensions
 static CellData **XCL;
@@ -12,10 +9,9 @@ static int rows, cols;
 
 // Initialize the backend with the given number of rows and columns
 void initBackend(int r, int c) {
-    // Store the dimensions globally
     rows = r;
     cols = c;
-    
+
     // Allocate memory for the rows
     XCL = (CellData**)malloc(rows * sizeof(CellData*));
     for (int i = 0; i < rows; i++) {
@@ -26,8 +22,8 @@ void initBackend(int r, int c) {
             XCL[i][j].cell.row = i;
             XCL[i][j].cell.col = j;
             XCL[i][j].value = 0;
-            vecInit(&XCL[i][j].dependents);
-            vecInit(&XCL[i][j].dependencies);
+            XCL[i][j].dependents = newVec(0);
+            XCL[i][j].dependencies = newVec(0);
             XCL[i][j].function.type = CONSTANT;
             XCL[i][j].function.data.value = 0;
             XCL[i][j].error = NO_ERROR;
@@ -43,30 +39,21 @@ int getCellValue(Cell cell, CellError *error) {
 
 // Check if there is a cycle starting from a given cell
 static bool isInCycle(Cell start, Cell current, bool **visited) {
-    Vec stack = newVec(10); // Initialize stack with initial capacity of 10
-    push(&stack, &current);
+    if (visited[current.row][current.col]) {
+        return current.row == start.row && current.col == start.col;
+    }
 
-    while (stack.size > 0) {
-        Cell *top = (Cell *)pop(&stack);
+    visited[current.row][current.col] = true;
+    CellData *currentCell = &XCL[current.row][current.col];
 
-        if (visited[top->row][top->col]) {
-            if (top->row == start.row && top->col == start.col) {
-                freeVec(&stack);
-                return true;
-            }
-            continue;
-        }
-
-        visited[top->row][top->col] = true;
-        CellData *currentCell = &XCL[top->row][top->col];
-
-        for (int i = 0; i < currentCell->dependencies.size; i++) {
-            Cell *dep = vecGet(&currentCell->dependencies, i);
-            push(&stack, dep);
+    for (int i = 0; i < currentCell->dependencies.size; i++) {
+        Cell *dep = get(&currentCell->dependencies, i);
+        if (isInCycle(start, *dep, visited)) {
+            return true;
         }
     }
 
-    freeVec(&stack);
+    visited[current.row][current.col] = false;
     return false;
 }
 
@@ -76,211 +63,148 @@ static bool checkCircularDependency(Cell cell) {
     for (int i = 0; i < rows; i++) {
         visited[i] = calloc(cols, sizeof(bool));
     }
-    
+
     bool hasCycle = isInCycle(cell, cell, visited);
-    
+
     for (int i = 0; i < rows; i++) {
         free(visited[i]);
     }
     free(visited);
-    
+
     return hasCycle;
 }
 
 // Update the dependencies of a cell based on its function
-static void updateDependencies(Cell cell) {
+static void update_on_which_dep(Cell cell) {
     CellData *cellData = &XCL[cell.row][cell.col];
-    
+
     // Clear old dependencies
-    vecClear(&cellData->dependencies);
-    
+    clear(&cellData->dependencies);
+
     // Add new dependencies based on function type
-    switch(cellData->function.type) {
+    switch (cellData->function.type) {
         case PLUS_OP:
         case MINUS_OP:
         case MULTIPLY_OP:
         case DIVIDE_OP: {
             BinaryOp *bop = &cellData->function.data.binaryOps;
             if (bop->first.type == OPERAND_CELL) {
-                vecPush(&cellData->dependencies, &bop->first.data.cell);
+                push(&cellData->dependencies, &bop->first.data.cell);
             }
             if (bop->second.type == OPERAND_CELL) {
-                vecPush(&cellData->dependencies, &bop->second.data.cell);
+                push(&cellData->dependencies, &bop->second.data.cell);
             }
             break;
         }
+        case MIN_FUNCTION:
+        case MAX_FUNCTION:
+        case AVG_FUNCTION:
+        case SUM_FUNCTION:
+        case STDEV_FUNCTION: {
+            RangeFunction *rangeFunc = &cellData->function.data.rangeFunctions;
+            for (int i = rangeFunc->topLeft.row; i <= rangeFunc->bottomRight.row; i++) {
+                for (int j = rangeFunc->topLeft.col; j <= rangeFunc->bottomRight.col; j++) {
+                    Cell dep = {i, j};
+                    push(&cellData->dependencies, &dep);
+                }
+            }
+            break;
+        }
+        default:
+            break;
     }
 }
 
 // Recursively update all cells that depend on a given cell
-static void updateDependents(Cell cell) {
+static void update_that_depend(Cell cell) {
     CellData *cellData = &XCL[cell.row][cell.col];
-    
+
     for (int i = 0; i < cellData->dependents.size; i++) {
-        Cell *dependent = vecGet(&cellData->dependents, i);
+        Cell *dependent = get(&cellData->dependents, i);
         CellData *depCell = &XCL[dependent->row][dependent->col];
-        
+
         // Recalculate the dependent cell's value
         CellError error = NO_ERROR;
         depCell->value = evaluateExpression(&depCell->function, &error);
         depCell->error = error;
-        
+
         // Continue updating dependents
-        updateDependents(*dependent);
+        update_that_depend(*dependent);
     }
 }
 
 // Set the value of a cell based on an expression
 ExpressionError setCellValue(Cell cell, char *expression) {
     // 1. Parse the expression
-    Function newFunction;
-    if (parseExpression(expression, &newFunction) != 0) {
+    bool success;
+    Function newFunction = parseExpression(expression, &success);
+    if (!success) {
         return COULD_NOT_PARSE;
     }
 
     CellData *cellData = &XCL[cell.row][cell.col];
-    
+
     // Store the new function temporarily
     Function oldFunction = cellData->function;
     cellData->function = newFunction;
-    
+
     // 2. Check for circular dependency with new function
     if (checkCircularDependency(cell)) {
         // Restore old function if circular dependency is found
         cellData->function = oldFunction;
         return CIRCULAR_DEPENDENCY;
     }
-    
+
     // 3. Update dependencies
-    updateDependencies(cell);
-    
+    update_on_which_dep(cell);
+
     // 4. Calculate new value
     CellError error = NO_ERROR;
     int newValue = evaluateExpression(&cellData->function, &error);
-    
+
     if (error != NO_ERROR) {
         cellData->error = error;
         cellData->value = 0;  // Reset value on error
-        // Note: We don't restore the old function here as the error is in evaluation,
-        // not in the formula structure
     } else {
         cellData->error = NO_ERROR;
         cellData->value = newValue;
     }
-    
+
     // 5. Update all dependent cells
-    updateDependents(cell);
-    
+    update_that_depend(cell);
+
     return NONE;
 }
 
 // Evaluate an expression and return its value
 static int evaluateExpression(Function *func, CellError *error) {
     *error = NO_ERROR;
-    
-    switch(func->type) {
-            
-        case PLUS_OP: {
+
+    switch (func->type) {
+        case PLUS_OP:
             return plusOp(XCL, func->data.binaryOps);
-        }
-        
-        case MINUS_OP: {
+        case MINUS_OP:
             return minusOp(XCL, func->data.binaryOps);
-        }
-        
-        case MULTIPLY_OP: {
+        case MULTIPLY_OP:
             return multiplyOp(XCL, func->data.binaryOps);
-        }
-        
-        case DIVIDE_OP: {
+        case DIVIDE_OP:
             return divideOp(XCL, func->data.binaryOps);
-        }
-
-        case MIN_FUNCTION: {
+        case MIN_FUNCTION:
             return minFunction(XCL, func->data.rangeFunctions);
-        }
-
-        case MAX_FUNCTION: {
+        case MAX_FUNCTION:
             return maxFunction(XCL, func->data.rangeFunctions);
-        }
-
-        case AVG_FUNCTION: {
+        case AVG_FUNCTION:
             return avgFunction(XCL, func->data.rangeFunctions);
-        }
-
-        case SUM_FUNCTION: {
+        case SUM_FUNCTION:
             return sumFunction(XCL, func->data.rangeFunctions);
-        }
-
-        case STDEV_FUNCTION: {
+        case STDEV_FUNCTION:
             return stdevFunction(XCL, func->data.rangeFunctions);
-        }
-
-        case SLEEP_FUNCTION: {
+        case SLEEP_FUNCTION:
             return sleepFunction(func->data.value);
-        }
-
-        case CONSTANT: {
+        case CONSTANT:
             return func->data.value;
-        }
-        
         default:
             *error = DEPENDENCY_ERROR;
             return 0;
-        }
+    }
 }
-
-// Get the formula of a cell as a string
-// char* getCellFormula(Cell cell) {
-//     CellData *cellData = &XCL[cell.row][cell.col];
-//     char *formula = malloc(100); // Allocate space for formula string
-    
-//     switch(cellData->function.type) {
-//         case CONSTANT:
-//             sprintf(formula, "%d", cellData->function.data.value);
-//             break;
-            
-//         case PLUS_OP:
-//         case MINUS_OP:
-//         case MULTIPLY_OP:
-//         case DIVIDE_OP: {
-//             char op = cellData->function.type == PLUS_OP ? '+' : 
-//                      cellData->function.type == MINUS_OP ? '-' :
-//                      cellData->function.type == MULTIPLY_OP ? '*' : '/';
-            
-//             BinaryOp *bop = &cellData->function.data.binaryOps;
-//             if (bop->first.type == OPERAND_CELL && bop->second.type == OPERAND_CELL) {
-//                 sprintf(formula, "%c%d%c%c%d", 
-//                     'A' + bop->first.data.cell.col,
-//                     bop->first.data.cell.row,
-//                     op,
-//                     'A' + bop->second.data.cell.col,
-//                     bop->second.data.cell.row);
-//             } else if (bop->first.type == OPERAND_CELL) {
-//                 sprintf(formula, "%c%d%c%d",
-//                     'A' + bop->first.data.cell.col,
-//                     bop->first.data.cell.row,
-//                     op,
-//                     bop->second.data.value);
-//             } else if (bop->second.type == OPERAND_CELL) {
-//                 sprintf(formula, "%d%c%c%d",
-//                     bop->first.data.value,
-//                     op,
-//                     'A' + bop->second.data.cell.col,
-//                     bop->second.data.cell.row);
-//             } else {
-//                 sprintf(formula, "%d%c%d",
-//                     bop->first.data.value,
-//                     op,
-//                     bop->second.data.value);
-//             }
-//             break;
-//         }
-        
-//         // Add other function types here
-//         default:
-//             strcpy(formula, "");
-//     }
-    
-//     return formula;
-// }

@@ -72,10 +72,6 @@ typedef struct {
     /**
      * Needs recalculation
      */
-    bool isDirty;
-    /**
-     * Cells that depend on this cell
-     */
     Vec dependents;
     /**
      * Cells that this cell depends on

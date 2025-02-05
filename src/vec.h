@@ -11,7 +11,6 @@ typedef struct {
     size_t capacity;
 } Vec;
 
-
 /**
  * This is a vector which holds pointers to data
  * Do note that this does not "own" the data like a c++ vector
@@ -20,10 +19,13 @@ Vec newVec(int capacity);
 
 void push(Vec* vec, void* data);
 
+void* pop(Vec* vec);
+
 void* get(const Vec* vec, size_t index);
 
 size_t getSize(const Vec* vec);
 
+void clear(Vec* vec);
 
 /**
  * Free the vector's array AND the vector itself.

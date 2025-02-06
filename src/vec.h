@@ -27,6 +27,8 @@ size_t getSize(const Vec* vec);
 
 void clear(Vec* vec);
 
+void removeAt(Vec* vec, size_t index);
+
 /**
  * Free the vector's array AND the vector itself.
  * Don't call free(vec) after this. It would cause a double free

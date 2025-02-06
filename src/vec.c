@@ -62,6 +62,17 @@ void clear(Vec* vec) {
     vec->size = 0;
 }
 
+void removeAt(Vec* vec, size_t index) {
+    if (index >= vec->size) {
+        fprintf(stderr, "Index out of bounds: %lu\n", index);
+        exit(EXIT_FAILURE);
+    }
+    for (size_t i = index; i < vec->size - 1; i++) {
+        vec->data[i] = vec->data[i + 1];
+    }
+    vec->size--;
+}
+
 void freeVec(Vec* vec) {
     free(vec->data);
     free(vec);

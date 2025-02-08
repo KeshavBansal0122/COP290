@@ -1,3 +1,4 @@
+
 #include "backend.h"
 #include "parser.h"
 #include <stdlib.h>
@@ -7,7 +8,8 @@
 static CellData **XCL;
 static int rows, cols;
 
-// Initialize the backend with the given number of rows and columns
+static int evaluateExpression(Function *func, CellError *error);
+
 void initBackend(int r, int c) {
     rows = r;
     cols = c;
@@ -31,54 +33,69 @@ void initBackend(int r, int c) {
     }
 }
 
-// Get the value of a cell and its error status
 int getCellValue(Cell cell, CellError *error) {
     *error = XCL[cell.row][cell.col].error;
     return XCL[cell.row][cell.col].value;
 }
 
-// Check if there is a cycle starting from a given cell
+//todo: Remove recursion ~ done
 static bool isInCycle(Cell start, Cell current, bool **visited) {
-    if (visited[current.row][current.col]) {
-        return current.row == start.row && current.col == start.col;
-    }
+    Vec stack = newVec(10); // Initialize stack with initial capacity of 10
+    push(&stack, &current);
 
-    visited[current.row][current.col] = true;
-    CellData *currentCell = &XCL[current.row][current.col];
+    while (stack.size > 0) {
+        Cell *top = (Cell *)pop(&stack);
 
-    for (int i = 0; i < currentCell->dependencies.size; i++) {
-        Cell *dep = get(&currentCell->dependencies, i);
-        if (isInCycle(start, *dep, visited)) {
-            return true;
+        if (visited[top->row][top->col]) {
+            if (top->row == start.row && top->col == start.col) {
+                freeVec(&stack);
+                return true;
+            }
+            continue;
+        }
+
+        visited[top->row][top->col] = true;
+        CellData *currentCell = &XCL[top->row][top->col];
+
+        for (int i = 0; i < currentCell->dependencies.size; i++) {
+            Cell *dep = get(&currentCell->dependencies, i);
+            push(&stack, dep);
         }
     }
 
-    visited[current.row][current.col] = false;
+    freeVec(&stack);
     return false;
 }
 
-// Check for circular dependency in the spreadsheet
+//todo: remove allocating an entire 2d array, move this to cell data ~ kuch toh kara h
 static bool checkCircularDependency(Cell cell) {
-    bool **visited = malloc(rows * sizeof(bool*));
-    for (int i = 0; i < rows; i++) {
-        visited[i] = calloc(cols, sizeof(bool));
-    }
-
-    bool hasCycle = isInCycle(cell, cell, visited);
-
-    for (int i = 0; i < rows; i++) {
-        free(visited[i]);
-    }
-    free(visited);
-
+    Vec visitedCells = newVec(10);
+    bool hasCycle = isInCycle(cell, cell, &visitedCells);
+    freeVec(&visitedCells);
     return hasCycle;
 }
 
-// Update the dependencies of a cell based on its function
-static void update_on_which_dep(Cell cell) {
+/**
+ * Removes all the old edges of the cell, and inserts new one according to its function.
+ * This includes both the in and out edges
+ * */
+static void update_graph(Cell cell) {
     CellData *cellData = &XCL[cell.row][cell.col];
 
-    // Clear old dependencies
+    // todo: clear this cell from the old dependencies' dependants ~ done
+    // todo: update dependants ~ done
+    // Clear old dependencies ~ done
+    for (int i = 0; i < cellData->dependencies.size; i++) {
+        Cell *dep = get(&cellData->dependencies, i);
+        CellData *depCell = &XCL[dep->row][dep->col];
+        for (int j = 0; j < depCell->dependents.size; j++) {
+            Cell *dependent = get(&depCell->dependents, j);
+            if (dependent->row == cell.row && dependent->col == cell.col) {
+                removeAt(&depCell->dependents, j);
+                break;
+            }
+        }
+    }
     clear(&cellData->dependencies);
 
     // Add new dependencies based on function type
@@ -90,9 +107,11 @@ static void update_on_which_dep(Cell cell) {
             BinaryOp *bop = &cellData->function.data.binaryOps;
             if (bop->first.type == OPERAND_CELL) {
                 push(&cellData->dependencies, &bop->first.data.cell);
+                push(&XCL[bop->first.data.cell.row][bop->first.data.cell.col].dependents, &cell);
             }
             if (bop->second.type == OPERAND_CELL) {
                 push(&cellData->dependencies, &bop->second.data.cell);
+                push(&XCL[bop->second.data.cell.row][bop->second.data.cell.col].dependents, &cell);
             }
             break;
         }
@@ -106,6 +125,7 @@ static void update_on_which_dep(Cell cell) {
                 for (int j = rangeFunc->topLeft.col; j <= rangeFunc->bottomRight.col; j++) {
                     Cell dep = {i, j};
                     push(&cellData->dependencies, &dep);
+                    push(&XCL[i][j].dependents, &cell);
                 }
             }
             break;
@@ -115,8 +135,10 @@ static void update_on_which_dep(Cell cell) {
     }
 }
 
-// Recursively update all cells that depend on a given cell
-static void update_that_depend(Cell cell) {
+/**
+ * Recursively update the value of the cells that depend on the given cell
+ * */
+static void update_dependants(Cell cell) {
     CellData *cellData = &XCL[cell.row][cell.col];
 
     for (int i = 0; i < cellData->dependents.size; i++) {
@@ -129,13 +151,38 @@ static void update_that_depend(Cell cell) {
         depCell->error = error;
 
         // Continue updating dependents
-        update_that_depend(*dependent);
+        update_dependants(*dependent);
     }
+}
+
+/**
+ * @return if the function can be safely replaced with a constant
+ */
+static bool isExpressionConstant(Function *func) {
+    switch (func->type) {
+        case PLUS_OP:
+        case MINUS_OP:
+        case MULTIPLY_OP:
+        case DIVIDE_OP:
+            return func->data.binaryOps.first.type == OPERAND_INT &&
+                    func->data.binaryOps.second.type == OPERAND_INT;
+        case CONSTANT:
+            return true;
+        default:
+            return false;
+    }
+}
+
+static Function constantFunction(int value) {
+    Function func;
+    func.type = CONSTANT;
+    func.data.value = value;
+    return func;
 }
 
 // Set the value of a cell based on an expression
 ExpressionError setCellValue(Cell cell, char *expression) {
-    // 1. Parse the expression
+    // Parse the expression
     bool success;
     Function newFunction = parseExpression(expression, &success);
     if (!success) {
@@ -143,20 +190,27 @@ ExpressionError setCellValue(Cell cell, char *expression) {
     }
 
     CellData *cellData = &XCL[cell.row][cell.col];
+    if(isExpressionConstant(&newFunction)){
+        cellData->value = evaluateExpression(&newFunction, &cellData->error);
+        cellData->function = constantFunction(cellData->value);
+        update_graph(cell);
+        update_dependants(cell);
+        return NONE;
+    }
 
-    // Store the new function temporarily
+    // 1. Save old function
     Function oldFunction = cellData->function;
-    cellData->function = newFunction;
 
-    // 2. Check for circular dependency with new function
+    //todo: update graph before checking for circular dependency
+    // 2. Update graph
+    cellData->function = newFunction;
+    update_graph(cell);
+
+    // Check for circular dependency
     if (checkCircularDependency(cell)) {
-        // Restore old function if circular dependency is found
         cellData->function = oldFunction;
         return CIRCULAR_DEPENDENCY;
     }
-
-    // 3. Update dependencies
-    update_on_which_dep(cell);
 
     // 4. Calculate new value
     CellError error = NO_ERROR;
@@ -170,35 +224,33 @@ ExpressionError setCellValue(Cell cell, char *expression) {
         cellData->value = newValue;
     }
 
-    // 5. Update all dependent cells
-    update_that_depend(cell);
+    update_dependants(cell);
 
     return NONE;
 }
 
 // Evaluate an expression and return its value
 static int evaluateExpression(Function *func, CellError *error) {
-    *error = NO_ERROR;
 
     switch (func->type) {
         case PLUS_OP:
-            return plusOp(XCL, func->data.binaryOps);
+            return plusOp(XCL, func->data.binaryOps, error);
         case MINUS_OP:
-            return minusOp(XCL, func->data.binaryOps);
+            return minusOp(XCL, func->data.binaryOps, error);
         case MULTIPLY_OP:
-            return multiplyOp(XCL, func->data.binaryOps);
+            return multiplyOp(XCL, func->data.binaryOps, error);
         case DIVIDE_OP:
-            return divideOp(XCL, func->data.binaryOps);
+            return divideOp(XCL, func->data.binaryOps, error);
         case MIN_FUNCTION:
-            return minFunction(XCL, func->data.rangeFunctions);
+            return minFunction(XCL, func->data.rangeFunctions, error);
         case MAX_FUNCTION:
-            return maxFunction(XCL, func->data.rangeFunctions);
+            return maxFunction(XCL, func->data.rangeFunctions, error);
         case AVG_FUNCTION:
-            return avgFunction(XCL, func->data.rangeFunctions);
+            return avgFunction(XCL, func->data.rangeFunctions, error);
         case SUM_FUNCTION:
-            return sumFunction(XCL, func->data.rangeFunctions);
+            return sumFunction(XCL, func->data.rangeFunctions, error);
         case STDEV_FUNCTION:
-            return stdevFunction(XCL, func->data.rangeFunctions);
+            return stdevFunction(XCL, func->data.rangeFunctions, error);
         case SLEEP_FUNCTION:
             return sleepFunction(func->data.value);
         case CONSTANT:

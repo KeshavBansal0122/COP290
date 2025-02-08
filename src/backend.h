@@ -1,5 +1,3 @@
-//
-// Created by paradocx on 1/18/25.
 #pragma once
 
 #include "structs.h"
@@ -10,22 +8,14 @@ typedef enum ExpressionError {
     COULD_NOT_PARSE,
 } ExpressionError;
 
-
 void initBackend(int rows, int cols);
 
 /**
- * Used for lazy evaluation. Outside cells will be evaluated only when needed
- */
-void updateViewport(Cell topLeft, Cell bottomRight);
-
-/**
  * @param error out parameter for error handling
- * @return The integer to displayed by the frontend. Not using an int
+ * @return The integer to be displayed by the frontend. Not using an int
  * to allow changing data types in the future
  */
-char* getCellValue(Cell cell, CellError* error);
-
-char* getCellFormula(Cell cell);
+int getCellValue(Cell cell, CellError* error);
 
 /**
  * @param expression The expression entered by the user.

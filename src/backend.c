@@ -2,7 +2,6 @@
 #include "backend.h"
 #include "parser.h"
 #include <stdlib.h>
-#include <string.h>
 
 // Global variables to store the spreadsheet data and its dimensions
 static CellData **XCL;
@@ -29,6 +28,8 @@ void initBackend(int r, int c) {
             XCL[i][j].function.type = CONSTANT;
             XCL[i][j].function.data.value = 0;
             XCL[i][j].error = NO_ERROR;
+            XCL[i][j].dirty_parents = 0;
+            XCL[i][j].found = false;
         }
     }
 }
@@ -38,42 +39,64 @@ int getCellValue(Cell cell, CellError *error) {
     return XCL[cell.row][cell.col].value;
 }
 
-//todo: Remove recursion ~ done
-static bool isInCycle(Cell start, Cell current, bool **visited) {
-    Vec stack = newVec(10); // Initialize stack with initial capacity of 10
-    push(&stack, current);
+static void resetFound(Cell start) {
+    Vec stack = newVec(10);// Initialize stack with initial capacity of 10
+    push(&stack, start);
+    XCL[start.row][start.col].found = false;
 
     while (stack.size > 0) {
         Cell top = pop(&stack);
 
-        if (visited[top.row][top.col]) {
-            if (top.row == start.row && top.col == start.col) {
-                freeVec(&stack);
-                return true;
+        CellData *topCellData = &XCL[top.row][top.col];
+        Vec* dependents = &topCellData->dependents;
+
+        for (int i = 0; i < dependents->size; ++i) {
+            Cell dep = get(dependents, i);
+            if (XCL[dep.row][dep.col].found) {
+                push(&stack, dep);
+                XCL[dep.row][dep.col].found = false;
             }
-            continue;
-        }
-
-        visited[top.row][top.col] = true;
-        CellData *currentCell = &XCL[top.row][top.col];
-
-        for (int i = 0; i < currentCell->dependencies.size; i++) {
-            Cell dep = get(&currentCell->dependencies, i);
-            push(&stack, dep);
         }
     }
 
     freeVec(&stack);
+}
+
+static bool isInCycle(Cell start) {
+
+    //do it via hash set
+
+    Vec stack = newVec(10); // Initialize stack with initial capacity of 10
+    push(&stack, start);
+
+    while (stack.size > 0) {
+        Cell top = pop(&stack);
+
+        CellData *topCellData = &XCL[top.row][top.col];
+        Vec* dependents = &topCellData->dependents;
+
+        for (int i = 0; i < dependents->size; ++i) {
+            Cell dep = get(dependents, i);
+            if (dep.row == start.row && dep.col == start.col) {
+                freeVec(&stack);
+                resetFound(start);
+                return true;
+            }
+
+            if (!XCL[dep.row][dep.col].found) {
+                push(&stack, dep);
+                XCL[dep.row][dep.col].found = true;
+            }
+        }
+    }
+
+    freeVec(&stack);
+    resetFound(start);
     return false;
 }
 
-//todo: remove allocating an entire 2d array, move this to cell data ~ kuch toh kara h
-//Galat hi kiya h
 static bool checkCircularDependency(Cell cell) {
-    Vec visitedCells = newVec(10);
-    bool hasCycle = isInCycle(cell, cell, &visitedCells);
-    freeVec(&visitedCells);
-    return hasCycle;
+    return isInCycle(cell);
 }
 
 /**
@@ -83,20 +106,14 @@ static bool checkCircularDependency(Cell cell) {
 static void update_graph(Cell cell) {
     CellData *cellData = &XCL[cell.row][cell.col];
 
-    // todo: clear this cell from the old dependencies' dependants ~ done
-    // todo: update dependants ~ done
-    // Clear old dependencies ~ done
+    //remove in edges => remove itself from the dependants of the old dependencies
     for (int i = 0; i < cellData->dependencies.size; i++) {
         Cell dep = get(&cellData->dependencies, i);
         CellData *depCell = &XCL[dep.row][dep.col];
-        for (int j = 0; j < depCell->dependents.size; j++) {
-            Cell dependent = get(&depCell->dependents, j);
-            if (dependent.row == cell.row && dependent.col == cell.col) {
-                removeAt(&depCell->dependents, j);
-                break;
-            }
-        }
+        removeItem(&depCell->dependents, cell);
     }
+
+    //remove out edges
     clear(&cellData->dependencies);
 
     // Add new dependencies based on function type
@@ -137,23 +154,66 @@ static void update_graph(Cell cell) {
 }
 
 /**
- * Recursively update the value of the cells that depend on the given cell
+ * Sets the number of *direct* parents which are dirty, starting from the given cell.
+ * Considers the root to be dirty, therefore the direct children of the root
+ * will have dirty_parents >= 1.
+ * The dirty_parents of root is set to 0
+ * */
+static void setDirtyParents(Cell cell, Vec* stack) {
+    push(stack,cell);
+    XCL[cell.row][cell.col].dirty_parents = 0;
+
+    while(stack->size) {
+        Cell top = pop(stack);
+        Vec* children = &XCL[top.row][top.col].dependents;
+        for (int i = 0; i < children->size; ++i) {
+            Cell child = get(children, i);
+            CellData *childData = &XCL[child.row][child.col];
+
+            if (childData->dirty_parents == 0) { //found for the first time
+                push(stack, child);
+            }
+            childData->dirty_parents++;
+        }
+    }
+}
+/**
+ * Recursively update the value of the cells that depend on the given cell.
+ * This performs sort of a toposort, and then updates the value of the cells
  * */
 static void update_dependants(Cell cell) {
+
     CellData *cellData = &XCL[cell.row][cell.col];
+    Vec stack = newVec(cellData->dependents.size);
+    setDirtyParents(cell, &stack);
 
-    for (int i = 0; i < cellData->dependents.size; i++) {
-        Cell dependent = get(&cellData->dependents, i);
-        CellData *depCell = &XCL[dependent.row][dependent.col];
-
-        // Recalculate the dependent cell's value
-        CellError error = NO_ERROR;
-        depCell->value = evaluateExpression(&depCell->function, &error);
-        depCell->error = error;
-
-        // Continue updating dependents
-        update_dependants(dependent);
+    //doing this for root out of the main loop to
+    //avoid re calculating the root twice
+    for (int i = 0; i < cellData->dependents.size; ++i) {
+        Cell child = get(&cellData->dependents, i);
+        CellData* childData = &XCL[child.row][child.col];
+        childData->dirty_parents--;
+        if (childData->dirty_parents == 0) {
+            push(&stack,child);
+        }
     }
+
+    while (stack.size) {
+        Cell top = pop(&stack);
+        CellData *topCell = &XCL[top.row][top.col];
+        topCell->value = evaluateExpression(&topCell->function, &topCell->error);
+
+        for (int i = 0; i < topCell->dependents.size; ++i) {
+            Cell child = get(&topCell->dependents, i);
+            CellData* childData = &XCL[child.row][child.col];
+            childData->dirty_parents--;
+            if (childData->dirty_parents == 0) {
+                push(&stack,child);
+            }
+        }
+    }
+
+    freeVec(&stack);
 }
 
 /**
@@ -190,6 +250,8 @@ ExpressionError setCellValue(Cell cell, char *expression) {
         return COULD_NOT_PARSE;
     }
 
+    // Shortcut if the entered function was a constant function
+    // or can be evaluated to a constant
     CellData *cellData = &XCL[cell.row][cell.col];
     if(isExpressionConstant(&newFunction)){
         cellData->value = evaluateExpression(&newFunction, &cellData->error);
@@ -202,7 +264,6 @@ ExpressionError setCellValue(Cell cell, char *expression) {
     // 1. Save old function
     Function oldFunction = cellData->function;
 
-    //todo: update graph before checking for circular dependency
     // 2. Update graph
     cellData->function = newFunction;
     update_graph(cell);
@@ -210,6 +271,7 @@ ExpressionError setCellValue(Cell cell, char *expression) {
     // Check for circular dependency
     if (checkCircularDependency(cell)) {
         cellData->function = oldFunction;
+        update_graph(cell);
         return CIRCULAR_DEPENDENCY;
     }
 
@@ -217,11 +279,9 @@ ExpressionError setCellValue(Cell cell, char *expression) {
     CellError error = NO_ERROR;
     int newValue = evaluateExpression(&cellData->function, &error);
 
-    if (error != NO_ERROR) {
-        cellData->error = error;
+    if ((cellData->error = error) != NO_ERROR) {
         cellData->value = 0;  // Reset value on error
     } else {
-        cellData->error = NO_ERROR;
         cellData->value = newValue;
     }
 

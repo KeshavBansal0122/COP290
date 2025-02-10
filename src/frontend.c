@@ -20,8 +20,7 @@
 
 
 
-int rows;
-int cols;
+static int rows, cols;
 int cellWidth = 10;
 int rowWidth;
 int colWidth;
@@ -73,8 +72,8 @@ void print_board() {
         for (int j = topLeft.col; j <= maxCol; j++) {
             CellError error;
             Cell cell = {i , j};
-            char* value = getCellValue(cell, &error);
-            printf("%-*s", cellWidth, value);
+            int value = getCellValue(cell, &error);
+            printf("%-*d", cellWidth, value);
         }
         printf("\n");
     }
@@ -179,6 +178,7 @@ bool doesExpressionContainError(const char* expression) {
  * @return whether the command was successful
  */
 bool runCommand(char* command) {
+    //todo: incomplete
     removeSpaces(command);
     if (command[0] >= 'A' && command[0] <= 'Z') {
         //A cell expression
@@ -213,9 +213,9 @@ bool runCommand(char* command) {
         } else if (command[i] == '\0') {
             //Query
             CellError error;
-            char* a = getCellValue(cell, &error);
+            int a = getCellValue(cell, &error);
 
-            printf("Computed Cell Value: %s\n", a);
+            printf("Computed Cell Value: %d\n", a);
 
 
         } else {
@@ -259,6 +259,7 @@ _Noreturn void runConsole() {
 void initFrontend(int row, int col) {
     rows = row;
     cols = col;
+    initBackend(row, col);
     topLeft.row = 1;
     topLeft.col = 1;
     rowWidth = min(MAX_WIDTH, rows);

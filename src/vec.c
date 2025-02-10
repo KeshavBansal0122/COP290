@@ -6,9 +6,9 @@
 #include <stdio.h>
 
 
-Vec newVec(const int capacity) {
+Vec newVec(const size_t capacity) {
     Vec vec;
-    vec.data = (void**)malloc(sizeof(void*) * capacity);
+    vec.data = malloc(sizeof(Cell) * capacity);
     if (!vec.data) {
         perror("Failed to allocate memory for vector");
         exit(EXIT_FAILURE);
@@ -21,7 +21,7 @@ Vec newVec(const int capacity) {
 void resize(Vec* vec) {
     vec->capacity = vec->capacity == 0 ? 1 : vec->capacity;
     size_t newCapacity = vec->capacity * 2;
-    void** newData = realloc(vec->data, sizeof(void*) * newCapacity);
+    Cell* newData = realloc(vec->data, sizeof(Cell) * newCapacity);
     if (!newData) {
         perror("Failed to resize vector");
         exit(EXIT_FAILURE);
@@ -30,14 +30,14 @@ void resize(Vec* vec) {
     vec->capacity = newCapacity;
 }
 
-void push(Vec* vec, void* data) {
+void push(Vec* vec, Cell data) {
     if (vec->size == vec->capacity) {
         resize(vec);
     }
     vec->data[vec->size++] = data;
 }
 
-void* pop(Vec* vec) {
+Cell pop(Vec* vec) {
     if (vec->size == 0) {
         printf("Vector is empty\n");
         exit(EXIT_FAILURE);
@@ -45,7 +45,7 @@ void* pop(Vec* vec) {
     return vec->data[vec->size--];
 }
 
-void* get(const Vec* vec, size_t index) {
+Cell get(const Vec* vec, size_t index) {
     if (index >= vec->size) {
         fprintf(stderr, "Index out of bounds: %lu\n", index);
         exit(EXIT_FAILURE);
@@ -73,7 +73,16 @@ void removeAt(Vec* vec, size_t index) {
     vec->size--;
 }
 
+bool removeItem(Vec* vec, Cell item) {
+    for (size_t i = 0; i < vec->size; i++) {
+        if (vec->data[i].row == item.row && vec->data[i].col == item.col) {
+            removeAt(vec, i);
+            return true;
+        }
+    }
+    return false;
+}
+
 void freeVec(Vec* vec) {
     free(vec->data);
-    free(vec);
 }

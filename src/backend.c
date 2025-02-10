@@ -41,24 +41,24 @@ int getCellValue(Cell cell, CellError *error) {
 //todo: Remove recursion ~ done
 static bool isInCycle(Cell start, Cell current, bool **visited) {
     Vec stack = newVec(10); // Initialize stack with initial capacity of 10
-    push(&stack, &current);
+    push(&stack, current);
 
     while (stack.size > 0) {
-        Cell *top = (Cell *)pop(&stack);
+        Cell top = pop(&stack);
 
-        if (visited[top->row][top->col]) {
-            if (top->row == start.row && top->col == start.col) {
+        if (visited[top.row][top.col]) {
+            if (top.row == start.row && top.col == start.col) {
                 freeVec(&stack);
                 return true;
             }
             continue;
         }
 
-        visited[top->row][top->col] = true;
-        CellData *currentCell = &XCL[top->row][top->col];
+        visited[top.row][top.col] = true;
+        CellData *currentCell = &XCL[top.row][top.col];
 
         for (int i = 0; i < currentCell->dependencies.size; i++) {
-            Cell *dep = get(&currentCell->dependencies, i);
+            Cell dep = get(&currentCell->dependencies, i);
             push(&stack, dep);
         }
     }
@@ -68,6 +68,7 @@ static bool isInCycle(Cell start, Cell current, bool **visited) {
 }
 
 //todo: remove allocating an entire 2d array, move this to cell data ~ kuch toh kara h
+//Galat hi kiya h
 static bool checkCircularDependency(Cell cell) {
     Vec visitedCells = newVec(10);
     bool hasCycle = isInCycle(cell, cell, &visitedCells);
@@ -86,11 +87,11 @@ static void update_graph(Cell cell) {
     // todo: update dependants ~ done
     // Clear old dependencies ~ done
     for (int i = 0; i < cellData->dependencies.size; i++) {
-        Cell *dep = get(&cellData->dependencies, i);
-        CellData *depCell = &XCL[dep->row][dep->col];
+        Cell dep = get(&cellData->dependencies, i);
+        CellData *depCell = &XCL[dep.row][dep.col];
         for (int j = 0; j < depCell->dependents.size; j++) {
-            Cell *dependent = get(&depCell->dependents, j);
-            if (dependent->row == cell.row && dependent->col == cell.col) {
+            Cell dependent = get(&depCell->dependents, j);
+            if (dependent.row == cell.row && dependent.col == cell.col) {
                 removeAt(&depCell->dependents, j);
                 break;
             }
@@ -106,12 +107,12 @@ static void update_graph(Cell cell) {
         case DIVIDE_OP: {
             BinaryOp *bop = &cellData->function.data.binaryOps;
             if (bop->first.type == OPERAND_CELL) {
-                push(&cellData->dependencies, &bop->first.data.cell);
-                push(&XCL[bop->first.data.cell.row][bop->first.data.cell.col].dependents, &cell);
+                push(&cellData->dependencies, bop->first.data.cell);
+                push(&XCL[bop->first.data.cell.row][bop->first.data.cell.col].dependents, cell);
             }
             if (bop->second.type == OPERAND_CELL) {
-                push(&cellData->dependencies, &bop->second.data.cell);
-                push(&XCL[bop->second.data.cell.row][bop->second.data.cell.col].dependents, &cell);
+                push(&cellData->dependencies, bop->second.data.cell);
+                push(&XCL[bop->second.data.cell.row][bop->second.data.cell.col].dependents, cell);
             }
             break;
         }
@@ -124,8 +125,8 @@ static void update_graph(Cell cell) {
             for (int i = rangeFunc->topLeft.row; i <= rangeFunc->bottomRight.row; i++) {
                 for (int j = rangeFunc->topLeft.col; j <= rangeFunc->bottomRight.col; j++) {
                     Cell dep = {i, j};
-                    push(&cellData->dependencies, &dep);
-                    push(&XCL[i][j].dependents, &cell);
+                    push(&cellData->dependencies, dep);
+                    push(&XCL[i][j].dependents, cell);
                 }
             }
             break;
@@ -142,8 +143,8 @@ static void update_dependants(Cell cell) {
     CellData *cellData = &XCL[cell.row][cell.col];
 
     for (int i = 0; i < cellData->dependents.size; i++) {
-        Cell *dependent = get(&cellData->dependents, i);
-        CellData *depCell = &XCL[dependent->row][dependent->col];
+        Cell dependent = get(&cellData->dependents, i);
+        CellData *depCell = &XCL[dependent.row][dependent.col];
 
         // Recalculate the dependent cell's value
         CellError error = NO_ERROR;
@@ -151,7 +152,7 @@ static void update_dependants(Cell cell) {
         depCell->error = error;
 
         // Continue updating dependents
-        update_dependants(*dependent);
+        update_dependants(dependent);
     }
 }
 

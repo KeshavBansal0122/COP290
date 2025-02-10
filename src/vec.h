@@ -4,24 +4,25 @@
 
 #pragma once
 #include <stddef.h>
+#include <stdbool.h>
+#include "cell.h"
 
 typedef struct {
-    void** data;
+    Cell* data;
     size_t size;
     size_t capacity;
 } Vec;
 
 /**
- * This is a vector which holds pointers to data
- * Do note that this does not "own" the data like a c++ vector
+ * This is a vector which holds Cells
  */
-Vec newVec(int capacity);
+Vec newVec(size_t capacity);
 
-void push(Vec* vec, void* data);
+void push(Vec* vec, Cell data);
 
-void* pop(Vec* vec);
+Cell pop(Vec* vec);
 
-void* get(const Vec* vec, size_t index);
+Cell get(const Vec* vec, size_t index);
 
 size_t getSize(const Vec* vec);
 
@@ -29,9 +30,8 @@ void clear(Vec* vec);
 
 void removeAt(Vec* vec, size_t index);
 
+bool removeItem(Vec* vec, Cell item);
 /**
- * Free the vector's array AND the vector itself.
- * Don't call free(vec) after this. It would cause a double free
- * Again: it would not call free on the data stored inside the vector
+ * Free the vector's array
  */
 void freeVec(Vec* vec);

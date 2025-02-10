@@ -5,11 +5,8 @@
 #include<stdbool.h>
 
 #include "vec.h"
+#include "cell.h"
 
-typedef struct {
-    int row;
-    int col;
-} Cell;
 
 typedef enum {
     NO_ERROR,
@@ -79,16 +76,24 @@ typedef struct {
     Vec dependencies;
     Function function;
     CellError error;
+    /**
+     * The number of parents that need to be recalculated before this one can be
+     */
+    size_t dirty_parents;
+    /**
+     * Useful for DFS
+     * */
+     bool found;
 } CellData;
 
 
-int minFunction(CellData** cells, RangeFunction rangeFunction);
-int maxFunction(CellData** cells, RangeFunction rangeFunction);
-int avgFunction(CellData** cells, RangeFunction rangeFunction);
-int sumFunction(CellData** cells, RangeFunction rangeFunction);
-int stdevFunction(CellData** cells, RangeFunction rangeFunction);
+int minFunction(CellData** cells, RangeFunction rangeFunction, CellError *error);
+int maxFunction(CellData** cells, RangeFunction rangeFunction, CellError *error);
+int avgFunction(CellData** cells, RangeFunction rangeFunction, CellError *error);
+int sumFunction(CellData** cells, RangeFunction rangeFunction, CellError *error);
+int stdevFunction(CellData** cells, RangeFunction rangeFunction, CellError *error);
 int sleepFunction(int sleepValue);
-int plusOp(CellData** cells, BinaryOp binaryOp);
-int minusOp(CellData** cells, BinaryOp binaryOp);
-int multiplyOp(CellData** cells, BinaryOp binaryOp);
-int divideOp(CellData** cells, BinaryOp binaryOp);
+int plusOp(CellData** cells, BinaryOp binaryOp, CellError *error);
+int minusOp(CellData** cells, BinaryOp binaryOp, CellError *error);
+int multiplyOp(CellData** cells, BinaryOp binaryOp, CellError *error);
+int divideOp(CellData** cells, BinaryOp binaryOp, CellError *error);

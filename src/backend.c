@@ -20,8 +20,6 @@ void initBackend(int r, int c) {
         XCL[i] = (CellData*)malloc(cols * sizeof(CellData));
         for (int j = 0; j < cols; j++) {
             // Initialize each cell with default values
-            XCL[i][j].cell.row = i;
-            XCL[i][j].cell.col = j;
             XCL[i][j].value = 0;
             XCL[i][j].dependents = newVec(0);
             XCL[i][j].dependencies = newVec(0);
@@ -148,6 +146,16 @@ static void update_graph(Cell cell) {
             }
             break;
         }
+
+        case SLEEP_FUNCTION: {
+            Operand *sleepValue = &cellData->function.data.sleep_value;
+            if (sleepValue->type == OPERAND_CELL) {
+                push(&cellData->dependencies, sleepValue->data.cell);
+                push(&XCL[sleepValue->data.cell.row][sleepValue->data.cell.col].dependents, cell);
+            }
+            break;
+        }
+
         default:
             break;
     }
@@ -295,29 +303,28 @@ static int evaluateExpression(Function *func, CellError *error) {
 
     switch (func->type) {
         case PLUS_OP:
-            return plusOp(XCL, func->data.binaryOps, error);
+            return plusOp(XCL, &func->data.binaryOps, error);
         case MINUS_OP:
-            return minusOp(XCL, func->data.binaryOps, error);
+            return minusOp(XCL, &func->data.binaryOps, error);
         case MULTIPLY_OP:
-            return multiplyOp(XCL, func->data.binaryOps, error);
+            return multiplyOp(XCL, &func->data.binaryOps, error);
         case DIVIDE_OP:
-            return divideOp(XCL, func->data.binaryOps, error);
+            return divideOp(XCL, &func->data.binaryOps, error);
         case MIN_FUNCTION:
-            return minFunction(XCL, func->data.rangeFunctions, error);
+            return minFunction(XCL, &func->data.rangeFunctions, error);
         case MAX_FUNCTION:
-            return maxFunction(XCL, func->data.rangeFunctions, error);
+            return maxFunction(XCL, &func->data.rangeFunctions, error);
         case AVG_FUNCTION:
-            return avgFunction(XCL, func->data.rangeFunctions, error);
+            return avgFunction(XCL, &func->data.rangeFunctions, error);
         case SUM_FUNCTION:
-            return sumFunction(XCL, func->data.rangeFunctions, error);
+            return sumFunction(XCL, &func->data.rangeFunctions, error);
         case STDEV_FUNCTION:
-            return stdevFunction(XCL, func->data.rangeFunctions, error);
+            return stdevFunction(XCL, &func->data.rangeFunctions, error);
         case SLEEP_FUNCTION:
-            return sleepFunction(func->data.value);
+            return sleepFunction(XCL, &func->data.sleep_value, error);
         case CONSTANT:
+            *error = NO_ERROR;
             return func->data.value;
-        default:
-            *error = DEPENDENCY_ERROR;
-            return 0;
+
     }
 }

@@ -6,12 +6,14 @@
 #include <stdio.h>
 
 
-Vec newVec(const size_t capacity) {
+Vec newVec(const int capacity) {
     Vec vec;
-    vec.data = malloc(sizeof(Cell) * capacity);
-    if (!vec.data) {
-        perror("Failed to allocate memory for vector");
-        exit(EXIT_FAILURE);
+    if (capacity > 0) {
+        vec.data = malloc(sizeof(Cell) * capacity);
+        if (!vec.data) {
+            perror("Failed to allocate memory for vector");
+            exit(EXIT_FAILURE);
+        }
     }
     vec.size = 0;
     vec.capacity = capacity;
@@ -19,8 +21,12 @@ Vec newVec(const size_t capacity) {
 }
 
 void resize(Vec* vec) {
-    vec->capacity = vec->capacity == 0 ? 1 : vec->capacity;
-    size_t newCapacity = vec->capacity * 2;
+    if (vec->capacity == 0) {
+        vec->capacity = 1;
+        vec->data = malloc(sizeof(Cell) * vec->capacity);
+        return;
+    }
+    int newCapacity = vec->capacity * 2;
     Cell* newData = realloc(vec->data, sizeof(Cell) * newCapacity);
     if (!newData) {
         perror("Failed to resize vector");
@@ -42,10 +48,11 @@ Cell pop(Vec* vec) {
         printf("Vector is empty\n");
         exit(EXIT_FAILURE);
     }
-    return vec->data[vec->size--];
+    vec->size--;
+    return vec->data[vec->size];
 }
 
-Cell get(const Vec* vec, size_t index) {
+Cell get(const Vec* vec, int index) {
     if (index >= vec->size) {
         fprintf(stderr, "Index out of bounds: %lu\n", index);
         exit(EXIT_FAILURE);
@@ -54,7 +61,7 @@ Cell get(const Vec* vec, size_t index) {
 }
 
 // Function to get the size of the vector
-size_t getSize(const Vec* vec) {
+int getSize(const Vec* vec) {
     return vec->size;
 }
 
@@ -62,19 +69,19 @@ void clear(Vec* vec) {
     vec->size = 0;
 }
 
-void removeAt(Vec* vec, size_t index) {
+void removeAt(Vec* vec, int index) {
     if (index >= vec->size) {
         fprintf(stderr, "Index out of bounds: %lu\n", index);
         exit(EXIT_FAILURE);
     }
-    for (size_t i = index; i < vec->size - 1; i++) {
+    for (int i = index; i < vec->size - 1; i++) {
         vec->data[i] = vec->data[i + 1];
     }
     vec->size--;
 }
 
 bool removeItem(Vec* vec, Cell item) {
-    for (size_t i = 0; i < vec->size; i++) {
+    for (int i = 0; i < vec->size; i++) {
         if (vec->data[i].row == item.row && vec->data[i].col == item.col) {
             removeAt(vec, i);
             return true;

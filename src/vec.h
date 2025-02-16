@@ -7,28 +7,28 @@
 #include <stdbool.h>
 #include "cell.h"
 
-typedef struct {
+typedef struct Vec {
     Cell* data;
-    size_t size;
-    size_t capacity;
+    int size;
+    int capacity;
 } Vec;
 
 /**
  * This is a vector which holds Cells
  */
-Vec newVec(size_t capacity);
+Vec newVec(int capacity);
 
 void push(Vec* vec, Cell data);
 
 Cell pop(Vec* vec);
 
-Cell get(const Vec* vec, size_t index);
+Cell get(const Vec* vec, int index);
 
-size_t getSize(const Vec* vec);
+int getSize(const Vec* vec);
 
 void clear(Vec* vec);
 
-void removeAt(Vec* vec, size_t index);
+void removeAt(Vec* vec, int index);
 
 bool removeItem(Vec* vec, Cell item);
 /**

@@ -11,7 +11,7 @@
 #include <time.h>
 
 #include "backend.h"
-#include "parser.h"
+// #include "parser.h"
 
 #define MAX_WIDTH 10
 
@@ -21,16 +21,105 @@
 
 
 static int rows, cols;
-int cellWidth = 10;
-int rowWidth;
-int colWidth;
-static bool doPrint = true;
+int cellWidth = 12;
+int rowWidth, colWidth;
+static bool doPrint = false;
 
 Cell topLeft;
 
 char* getLine();
 
-char* numberToColumnHeader(int number) {
+/*
+ * Temporary, while parser is being worked on, to allow frontend to compile 
+ */
+static size_t next_token(const char *expression) {
+    size_t index = 0;
+
+    if (expression[index] == '\0') { // End of string, no tokens left
+        return index;
+    }
+
+    if (isalnum(expression[index])) {
+        while (expression[index] && isalnum(expression[index])) {
+            index++;
+        }
+    } else {
+        // It's a single special character
+        index++;
+    }
+
+    return index;
+}
+
+static int convert_to_int(const char* expression, size_t len, bool* success) {
+    int result = 0;
+    int i = 0;
+    int multiplier = 1;
+    if(expression[i] == '+') {
+        i++;
+        if(i == len) {
+            *success = false;
+            return 0;
+        }
+    }
+    if(expression[i] == '-') {
+        multiplier = -1;
+        i++;
+        if(i == len) {
+            *success = false;
+            return 0;
+        }
+    }
+
+    while (i < len && expression[i] >= '0' && expression[i] <= '9')
+    {
+        result = result * 10 + (expression[i] - '0');
+        i++;
+    }
+
+    *success = i == len;
+
+    return result * multiplier;
+}
+
+static Cell parseCellReference(const char *reference, size_t len, bool *success) {
+    Cell cell = {0, 0};
+    int i = 0;
+
+    // Parse column (letters)
+    while (i < len && reference[i] >= 'A' && reference[i] <= 'Z')
+    {
+        cell.col = cell.col * 26 + (reference[i] - 'A' + 1);  // Convert letters to column index
+        i++;
+    }
+
+
+    if (i == len) {
+        *success = false;
+        return cell;
+    }
+
+    // Parse row (numbers)
+    if (reference[i] >= '0' && reference[i] <= '9')
+    {
+        cell.row = convert_to_int(&reference[i], len - i, success);  // Convert digits to row number
+    }
+
+    cell.row--;cell.col--;
+    if (cell.row < 0 || cell.row >= rows || cell.col < 0 || cell.col >= cols) {
+        *success = false;
+    }
+    return cell;
+}
+
+
+
+
+/**
+ * 0 based indexing. Returned string should be freed by the caller
+ * */
+static char* numberToColumnHeader(int number) {
+    number++;
     char buffer[4]; // Temporary buffer for the result in reverse order
     int index = 0;
 
@@ -53,27 +142,31 @@ char* numberToColumnHeader(int number) {
 void print_board() {
     //print headers
     if (!doPrint) return;
-    rowWidth = min(MAX_WIDTH, rows - topLeft.row + 1);
-    colWidth = min(MAX_WIDTH, cols - topLeft.col + 1);
+    rowWidth = min(MAX_WIDTH, rows - topLeft.row);
+    colWidth = min(MAX_WIDTH, cols - topLeft.col);
     printf("%-*s", cellWidth, "");
     int maxCol = topLeft.col + colWidth - 1;
     int maxRow = topLeft.row + rowWidth - 1;
 
     for (int i = topLeft.col; i <= maxCol; i++) {
         char *header = numberToColumnHeader(i);
-        printf(" %-*s", cellWidth, header);
+        printf("%-*s", cellWidth, header);
         free(header);
     }
     printf("\n");
 
     for (int i = topLeft.row; i <= maxRow; i++) {
-        printf("%-*d", cellWidth, i);
+        printf("%-*d", cellWidth, i+1);
 
         for (int j = topLeft.col; j <= maxCol; j++) {
             CellError error;
             Cell cell = {i , j};
             int value = getCellValue(cell, &error);
-            printf("%-*d", cellWidth, value);
+            if (error != NO_ERROR) {
+                printf("%-*s", cellWidth, "ERR");
+            } else {
+                printf("%-*d", cellWidth, value);
+            }
         }
         printf("\n");
     }
@@ -101,48 +194,42 @@ static void removeSpaces(char* str) {
     str[j] = '\0';
 }
 
-static bool isCellInRange(Cell cell) {
-    return cell.row >= 1 && cell.row <= rows && cell.col >= 1 && cell.col <= cols;
-}
-
 bool runFrontendCommand(const char* command) {
     //wasd,q
     if (command[1] == '\0' ) {
         switch (command[0]) {
             case 'w':
-                topLeft.row = topLeft.row - MAX_WIDTH; break;
+                if(topLeft.row - MAX_WIDTH >= 0) topLeft.row = topLeft.row - MAX_WIDTH; break;
             case 's':
-                topLeft.row = topLeft.row + MAX_WIDTH; break;
+                if(topLeft.row + 2*MAX_WIDTH<= rows) topLeft.row = topLeft.row + MAX_WIDTH; break;
             case 'd':
-                topLeft.col = topLeft.col + MAX_WIDTH; break;
+                if(topLeft.col + 2*MAX_WIDTH <= cols) topLeft.col = topLeft.col + MAX_WIDTH; break;
             case 'a':
-                topLeft.col = topLeft.col - MAX_WIDTH; break;
+                if(topLeft.col - MAX_FUNCTION >= 0) topLeft.col = topLeft.col - MAX_WIDTH; break;
             case 'q':
                 exit(0);
             default:
                 printf("Unknown Command\n"); return false;
         }
-        if (topLeft.row < 1) {
-            topLeft.row = 1;
-        }
-        if (topLeft.col < 1) {topLeft.col = 1;}
-        if (topLeft.row + MAX_WIDTH > rows) {
-            topLeft.row = rows - MAX_WIDTH + 1;
-        }
-        if (topLeft.col + MAX_WIDTH > cols) {
-            topLeft.col = cols - MAX_WIDTH + 1;
-        }
         return true;
     }
-    if (strncmp(command, "disable_output", 14) == 0) {
+    if (strncmp(command, "disable_output", 14) == 0 && command[14] == '\0') {
         doPrint = false;
-    } else if (strncmp(command, "enable_output", 13) == 0) {
+    } else if (strncmp(command, "enable_output", 13) == 0 && command[13] == '\0') {
         doPrint = true;
-    } else if (strncmp(command, "scroll_to", 9) == 0) {
+    } else if (strncmp(command, "scroll_to", 9) == 0 && command[9] == ' ') {
+
         const char* cellAddress = &command[10];
-        Cell cell = getCell(cellAddress);
-        if (!isCellInRange(cell)) {
-            printf("Cell %s not in range\n", cellAddress);
+        int cellLen = next_token(cellAddress);
+        if (cellAddress[cellLen] != '\0') {
+            printf("Invalid Syntax\n");
+            return false;
+        }
+        bool success;
+
+        Cell cell = parseCellReference(cellAddress, cellLen, &success);
+        if (!success) {
+            printf("Could not parse\n");
             return false;
         }
 
@@ -163,7 +250,7 @@ bool doesExpressionContainError(const char* expression) {
         return true;
     }
 
-    for(size_t i = 1; expression[i]; i++) {
+    for(int i = 1; expression[i]; i++) {
         if (isspace(expression[i]) && isalnum(expression[i-1]) && isalnum(expression[i+1])) {
             return true;
         }
@@ -178,49 +265,37 @@ bool doesExpressionContainError(const char* expression) {
  * @return whether the command was successful
  */
 bool runCommand(char* command) {
-    //todo: incomplete
-    removeSpaces(command);
     if (command[0] >= 'A' && command[0] <= 'Z') {
         //A cell expression
-        size_t i =0;
-        while (isalnum(command[i])) {i++;}
-        
-        char cellAddress[i+1];
-        strncpy(cellAddress, command, i);
-        cellAddress[i] = '\0';
-
-        Cell cell = getCell(cellAddress);
-
-        if (cell.row > rows || cell.col > cols) {
-            printf("Cell %s not in range\n", cellAddress);
+        bool success;
+        int cellLen = next_token(command);
+        Cell cell = parseCellReference(command, cellLen, &success);
+        if (!success) {
+            command[cellLen] = '\0';
+            printf("Cell %s not in range\n", command);
             return false;
         }
 
-        if (command[i] == '=') {
-            //set expression
-            i++;
-            size_t l = strlen(command);
-            char expression[l-i+1];
-            strncpy(expression, &command[i], l-i);
-            expression[l-i] = '\0';
-
-            if (doesExpressionContainError(expression)) {
-                printf("Invalid Expression\n");
-                return false;
-            }
-            setCellValue(cell, expression);
-            //todo: handle error
-        } else if (command[i] == '\0') {
-            //Query
-            CellError error;
-            int a = getCellValue(cell, &error);
-
-            printf("Computed Cell Value: %d\n", a);
-
-
-        } else {
-            printf("Could not understand the query");
+        if (command[cellLen] != '=') {
+            printf("Invalid Syntax\n");
+            return false;
         }
+
+        ExpressionError err = setCellValue(cell, &command[cellLen + 1]);
+        switch (err) {
+            case NONE:
+                return true;
+            case COULD_NOT_PARSE:
+                printf("Could not parse expression\n");
+                return false;
+            case CIRCULAR_DEPENDENCY:
+                printf("Circular Dependency\n");
+                return false;
+            default:
+                printf("ExpressionError has an invalid value\n");
+                return false;
+        }
+
     } else {
         //movement or quit
         return runFrontendCommand(command);
@@ -235,9 +310,10 @@ _Noreturn void runConsole() {
         printf("[%.1f] (%s) > ", timeTaken, status);
 
         char* buffer = getLine();
-        time_t start_time, end_time;
-        time(&start_time);
+        clock_t start_time, end_time;
+        start_time = clock();
 
+        removeSpaces(buffer);
         if (buffer[0] == '\0') {
             free(buffer);
             continue; // only enter
@@ -250,8 +326,8 @@ _Noreturn void runConsole() {
         }
         free(buffer);
 
-        time(&end_time);
-        timeTaken = (end_time - start_time) / 10.0;
+        end_time = clock();
+        timeTaken = ((double)(end_time - start_time)) / CLOCKS_PER_SEC;
         print_board();
     }
 }
@@ -259,9 +335,10 @@ _Noreturn void runConsole() {
 void initFrontend(int row, int col) {
     rows = row;
     cols = col;
+    // parserSetSize(row, col);
     initBackend(row, col);
-    topLeft.row = 1;
-    topLeft.col = 1;
+    topLeft.row = 0;
+    topLeft.col = 0;
     rowWidth = min(MAX_WIDTH, rows);
     colWidth = min(MAX_WIDTH, cols);
     print_board();
@@ -269,9 +346,9 @@ void initFrontend(int row, int col) {
 }
 
 char* getLine() {
-    size_t length = 16;
+    int length = 16;
     char* buffer = malloc(length * sizeof(char));
-    size_t i = 0;
+    int i = 0;
     int c;
     while( ((c = getchar()) != EOF) && c != '\n') {
         if (i >= length-1) {

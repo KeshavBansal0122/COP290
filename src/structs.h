@@ -59,12 +59,12 @@ typedef struct Function {
     union {
         RangeFunction rangeFunctions; // Used for MinFunction, MaxFunction, AvgFunction, SumFunction, StdevFunction
         BinaryOp binaryOps;          // Used for PlusOp, MinusOp, MultiplyOp, DivideOp
-        int value;                  // Used for SleepFunction, Constant
+        Operand sleep_value;        // Used for SleepFunction
+        int value;                 // Used for Constant
     } data;
 } Function;
 
-typedef struct {
-    Cell cell;
+typedef struct CellData {
     int value;
     /**
      * Needs recalculation
@@ -87,13 +87,13 @@ typedef struct {
 } CellData;
 
 
-int minFunction(CellData** cells, RangeFunction rangeFunction, CellError *error);
-int maxFunction(CellData** cells, RangeFunction rangeFunction, CellError *error);
-int avgFunction(CellData** cells, RangeFunction rangeFunction, CellError *error);
-int sumFunction(CellData** cells, RangeFunction rangeFunction, CellError *error);
-int stdevFunction(CellData** cells, RangeFunction rangeFunction, CellError *error);
-int sleepFunction(int sleepValue);
-int plusOp(CellData** cells, BinaryOp binaryOp, CellError *error);
-int minusOp(CellData** cells, BinaryOp binaryOp, CellError *error);
-int multiplyOp(CellData** cells, BinaryOp binaryOp, CellError *error);
-int divideOp(CellData** cells, BinaryOp binaryOp, CellError *error);
+int minFunction(CellData** cells, RangeFunction *rangeFunction, CellError *error);
+int maxFunction(CellData** cells, RangeFunction *rangeFunction, CellError *error);
+int avgFunction(CellData** cells, RangeFunction *rangeFunction, CellError *error);
+int sumFunction(CellData** cells, RangeFunction *rangeFunction, CellError *error);
+int stdevFunction(CellData** cells, RangeFunction *rangeFunction, CellError *error);
+int sleepFunction(CellData** cells, Operand *sleep_value, CellError *error);
+int plusOp(CellData** cells, BinaryOp *binaryOp, CellError *error);
+int minusOp(CellData** cells, BinaryOp *binaryOp, CellError *error);
+int multiplyOp(CellData** cells, BinaryOp *binaryOp, CellError *error);
+int divideOp(CellData** cells, BinaryOp *binaryOp, CellError *error);

@@ -8,8 +8,10 @@
 
 /**
  * A (row, column) tuple. Please just use directly as a value type.
+ * Row and column are guaranteed to be in [0 18,768]. short suffices
  **/
+
 typedef struct {
-    int row;
-    int col;
+    short row;
+    short col;
 } Cell;

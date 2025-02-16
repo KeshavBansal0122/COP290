@@ -1,8 +1,8 @@
 # Example Makefile content:
 CC = gcc
-CFLAGS = -Wall -Wextra
+CFLAGS = -Wall -Wextra -O3
 CFLAGS =
-LDFLAGS = -lm
+LDFLAGS = -lm -flto
 TEST_CFLAGS = $(CFLAGS) -I./tests
 
 SRC_DIR = src

@@ -189,7 +189,7 @@ static void setDirtyParents(Cell cell, Vec* stack) {
  * Recursively update the value of the cells that depend on the given cell.
  * This performs sort of a toposort, and then updates the value of the cells
  * */
-static void update_dependants(Cell cell) {
+static void update_dependants(Cell cell, int oldValue) {
 
     CellData *cellData = &XCL[cell.row][cell.col];
     Vec stack = newVec(cellData->dependents.size);
@@ -209,14 +209,30 @@ static void update_dependants(Cell cell) {
     while (stack.size) {
         Cell top = pop(&stack);
         CellData *topCell = &XCL[top.row][top.col];
-        topCell->value = evaluateExpression(&topCell->function, &topCell->error);
+
+        if (topCell->function.type == SUM_FUNCTION) {
+            topCell-> value += cellData->value - oldValue;
+        }
+        else if(topCell->function.type == MIN_FUNCTION){
+            if(cellData->value < topCell->value){
+                topCell->value = cellData->value;
+            }
+        }
+        else if(topCell->function.type == MAX_FUNCTION){
+            if(cellData->value > topCell->value){
+                topCell->value = cellData->value;
+            }
+        }
+        else {
+            topCell->value = evaluateExpression(&topCell->function, &topCell->error);
+        }
 
         for (int i = 0; i < topCell->dependents.size; ++i) {
             Cell child = get(&topCell->dependents, i);
             CellData* childData = &XCL[child.row][child.col];
             childData->dirty_parents--;
             if (childData->dirty_parents == 0) {
-                push(&stack,child);
+                push(&stack, child);
             }
         }
     }
@@ -262,10 +278,11 @@ ExpressionError setCellValue(Cell cell, char *expression) {
     // or can be evaluated to a constant
     CellData *cellData = &XCL[cell.row][cell.col];
     if(isExpressionConstant(&newFunction)){
+        int oldValue = cellData->value;
         cellData->value = evaluateExpression(&newFunction, &cellData->error);
         cellData->function = constantFunction(cellData->value);
         update_graph(cell);
-        update_dependants(cell);
+        update_dependants(cell, oldValue);
         return NONE;
     }
 
@@ -285,6 +302,7 @@ ExpressionError setCellValue(Cell cell, char *expression) {
 
     // 4. Calculate new value
     CellError error = NO_ERROR;
+    int oldValue = cellData->value;
     int newValue = evaluateExpression(&cellData->function, &error);
 
     if ((cellData->error = error) != NO_ERROR) {
@@ -293,7 +311,7 @@ ExpressionError setCellValue(Cell cell, char *expression) {
         cellData->value = newValue;
     }
 
-    update_dependants(cell);
+    update_dependants(cell, oldValue);
 
     return NONE;
 }

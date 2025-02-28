@@ -3,14 +3,29 @@
 //
 
 #pragma once
+#define STACK_ARRAY_LEN 3
 #include <stddef.h>
 #include <stdbool.h>
 #include "cell.h"
 
+
+/*
+ * This vector stack allocates the data for capacity <= 3
+ * This does not affect the stack size of the vector
+ * */
 typedef struct Vec {
-    Cell* data;
-    int size;
-    int capacity;
+    union {
+        struct {
+            int capacity;
+            int _size;
+            Cell* data;
+        };
+        struct {
+            //needed for alignment with the actual useful capacity variable
+            int capacity2;
+            Cell stack_data[STACK_ARRAY_LEN];
+        };
+    };
 } Vec;
 
 /**

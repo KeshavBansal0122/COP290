@@ -10,6 +10,21 @@ void sleep(int sleepValue){
 #include <unistd.h>
 #endif
 
+bool isRangeFunction(FunctionType type) {
+    return type == MIN_FUNCTION ||
+        type == MAX_FUNCTION ||
+        type == AVG_FUNCTION ||
+        type == SUM_FUNCTION ||
+        type == STDEV_FUNCTION;
+}
+
+bool isBinaryOp(FunctionType type) {
+    return type == PLUS_OP ||
+        type == MINUS_OP ||
+        type == MULTIPLY_OP ||
+        type == DIVIDE_OP;
+}
+
 int minFunction(CellData** cells, RangeFunction *rangeFunction, CellError *error){
     int min = INT_MAX;
     *error = NO_ERROR;
@@ -46,7 +61,7 @@ int maxFunction(CellData** cells, RangeFunction *rangeFunction, CellError *error
 
 int avgFunction(CellData** cells, RangeFunction *rangeFunction, CellError *error){
     *error = NO_ERROR;
-    double sum = 0;
+    int sum = 0;
     int count = 0;
     for (int i = rangeFunction->topLeft.row; i <= rangeFunction->bottomRight.row; i++) {
         for (int j = rangeFunction->topLeft.col; j <= rangeFunction->bottomRight.col; j++) {
@@ -58,7 +73,7 @@ int avgFunction(CellData** cells, RangeFunction *rangeFunction, CellError *error
             count++;
         }
     }
-    return round(sum / count);
+    return sum / count;
 }
 
 int sumFunction(CellData** cells, RangeFunction *rangeFunction, CellError *error){
@@ -78,11 +93,10 @@ int sumFunction(CellData** cells, RangeFunction *rangeFunction, CellError *error
 
 
 int stdevFunction(CellData** cells, RangeFunction *rangeFunction, CellError *error){
-    //todo: A weird implementation given on piazza
-
     *error = NO_ERROR;
     int sum = 0;
     int count = 0;
+
     for (int i = rangeFunction->topLeft.row; i <= rangeFunction->bottomRight.row; i++) {
         for (int j = rangeFunction->topLeft.col; j <= rangeFunction->bottomRight.col; j++) {
             if(cells[i][j].error != NO_ERROR){
@@ -93,15 +107,16 @@ int stdevFunction(CellData** cells, RangeFunction *rangeFunction, CellError *err
             count++;
         }
     }
-    // do all rounding at the end
-    double mean = (double)sum / count;
-    double sumOfSquares = 0;
+
+    int mean = sum / count;
+    double variance = 0;
     for (int i = rangeFunction->topLeft.row; i <= rangeFunction->bottomRight.row; i++) {
         for (int j = rangeFunction->topLeft.col; j <= rangeFunction->bottomRight.col; j++) {
-            sumOfSquares += (cells[i][j].value - mean) * (cells[i][j].value - mean);
+            variance += (cells[i][j].value - mean) * (cells[i][j].value - mean);
         }
     }
-    return (int) round(sqrt(sumOfSquares / count));
+    variance /= count;
+    return (int) round(sqrt(variance));
 }
 
 int sleepFunction(CellData** cells, Operand *sleep_value, CellError *error){
@@ -117,7 +132,6 @@ int sleepFunction(CellData** cells, Operand *sleep_value, CellError *error){
     }
     if (sleepTime > 0)
         sleep(sleepTime);
-
     return sleepTime;
 }
 

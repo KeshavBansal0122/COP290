@@ -1,7 +1,11 @@
 
 #include "backend.h"
+
+#include <stdio.h>
+
 #include "parser.h"
 #include <stdlib.h>
+#include <string.h>
 
 // Global variables to store the spreadsheet data and its dimensions
 static CellData **XCL;
@@ -17,18 +21,8 @@ void initBackend(int r, int c) {
     XCL = (CellData**)malloc(rows * sizeof(CellData*));
     for (int i = 0; i < rows; i++) {
         // Allocate memory for the columns in each row
-        XCL[i] = (CellData*)malloc(cols * sizeof(CellData));
-        for (int j = 0; j < cols; j++) {
-            // Initialize each cell with default values
-            XCL[i][j].value = 0;
-            XCL[i][j].dependents = newVec(0);
-            XCL[i][j].dependencies = newVec(0);
-            XCL[i][j].function.type = CONSTANT;
-            XCL[i][j].function.data.value = 0;
-            XCL[i][j].error = NO_ERROR;
-            XCL[i][j].dirty_parents = 0;
-            XCL[i][j].found = false;
-        }
+        XCL[i] = (CellData*)malloc(cols* sizeof(CellData));
+        memset(XCL[i], 0, cols * sizeof(CellData));
     }
 }
 
@@ -37,22 +31,25 @@ int getCellValue(Cell cell, CellError *error) {
     return XCL[cell.row][cell.col].value;
 }
 
-static void resetFound(Cell start) {
-    Vec stack = newVec(10);// Initialize stack with initial capacity of 10
-    push(&stack, start);
-    XCL[start.row][start.col].found = false;
 
-    while (stack.size > 0) {
+static void resetFound(Cell start) {
+    //using dirty parents in place of found tag for space savings
+
+    Vec stack = newVec(0);
+    push(&stack, start);
+    XCL[start.row][start.col].dirty_parents = false;
+
+    while (getSize(&stack) > 0) {
         Cell top = pop(&stack);
 
         CellData *topCellData = &XCL[top.row][top.col];
         Vec* dependents = &topCellData->dependents;
 
-        for (int i = 0; i < dependents->size; ++i) {
+        for (int i = 0; i < getSize(dependents); ++i) {
             Cell dep = get(dependents, i);
-            if (XCL[dep.row][dep.col].found) {
+            if (XCL[dep.row][dep.col].dirty_parents) {
                 push(&stack, dep);
-                XCL[dep.row][dep.col].found = false;
+                XCL[dep.row][dep.col].dirty_parents = false;
             }
         }
     }
@@ -62,18 +59,18 @@ static void resetFound(Cell start) {
 
 static bool isInCycle(Cell start) {
 
-    //do it via hash set
+    //using dirty parents in place of found tag for space savings
 
-    Vec stack = newVec(10); // Initialize stack with initial capacity of 10
+    Vec stack = newVec(0);
     push(&stack, start);
 
-    while (stack.size > 0) {
+    while (getSize(&stack) > 0) {
         Cell top = pop(&stack);
 
         CellData *topCellData = &XCL[top.row][top.col];
         Vec* dependents = &topCellData->dependents;
 
-        for (int i = 0; i < dependents->size; ++i) {
+        for (int i = 0; i < getSize(dependents); ++i) {
             Cell dep = get(dependents, i);
             if (dep.row == start.row && dep.col == start.col) {
                 freeVec(&stack);
@@ -81,9 +78,9 @@ static bool isInCycle(Cell start) {
                 return true;
             }
 
-            if (!XCL[dep.row][dep.col].found) {
+            if (!XCL[dep.row][dep.col].dirty_parents) {
                 push(&stack, dep);
-                XCL[dep.row][dep.col].found = true;
+                XCL[dep.row][dep.col].dirty_parents = true;
             }
         }
     }
@@ -100,64 +97,68 @@ static bool checkCircularDependency(Cell cell) {
 /**
  * Removes all the old edges of the cell, and inserts new one according to its function.
  * This includes both the in and out edges
+ * @param cell The cell whose edges are to be updated
+ * @param oldFunction The old function of the cell. Used for removing the old edges
  * */
-static void update_graph(Cell cell) {
+static void update_graph(Cell cell, Function *oldFunction) {
     CellData *cellData = &XCL[cell.row][cell.col];
 
     //remove in edges => remove itself from the dependants of the old dependencies
-    for (int i = 0; i < cellData->dependencies.size; i++) {
-        Cell dep = get(&cellData->dependencies, i);
-        CellData *depCell = &XCL[dep.row][dep.col];
-        removeItem(&depCell->dependents, cell);
+    FunctionType type = oldFunction->type;
+    if (isRangeFunction(type)) {
+        RangeFunction *range = &oldFunction->data.rangeFunctions;
+        for(short i = range->topLeft.row; i <= range->bottomRight.row; i++) {
+            for(short j = range->topLeft.col; j <= range->bottomRight.col; j++) {
+                CellData *parent = &XCL[i][j];
+                removeItem(&parent->dependents, cell);
+            }
+        }
+
+    } else if (isBinaryOp(type)) {
+        if (oldFunction->data.binaryOps.first.type == OPERAND_CELL) {
+            Cell dep = cellData->function.data.binaryOps.first.data.cell;
+            CellData *parent = &XCL[dep.row][dep.col];
+            removeItem(&parent->dependents, cell);
+        }
+        if (oldFunction->data.binaryOps.second.type == OPERAND_CELL) {
+            Cell dep = cellData->function.data.binaryOps.second.data.cell;
+            CellData *parent = &XCL[dep.row][dep.col];
+            removeItem(&parent->dependents, cell);
+        }
+
+    } else if (type == SLEEP_FUNCTION) {
+        Operand *sleepValue = &oldFunction->data.sleep_value;
+        if (sleepValue->type == OPERAND_CELL) {
+            Cell dep = sleepValue->data.cell;
+            CellData *parent = &XCL[dep.row][dep.col];
+            removeItem(&parent->dependents, cell);
+        }
     }
 
-    //remove out edges
-    clear(&cellData->dependencies);
-
-    // Add new dependencies based on function type
-    switch (cellData->function.type) {
-        case PLUS_OP:
-        case MINUS_OP:
-        case MULTIPLY_OP:
-        case DIVIDE_OP: {
-            BinaryOp *bop = &cellData->function.data.binaryOps;
-            if (bop->first.type == OPERAND_CELL) {
-                push(&cellData->dependencies, bop->first.data.cell);
-                push(&XCL[bop->first.data.cell.row][bop->first.data.cell.col].dependents, cell);
-            }
-            if (bop->second.type == OPERAND_CELL) {
-                push(&cellData->dependencies, bop->second.data.cell);
-                push(&XCL[bop->second.data.cell.row][bop->second.data.cell.col].dependents, cell);
-            }
-            break;
+    //add new edges => add itself to the dependants of the new dependencies
+    type = cellData->function.type;
+    if (isBinaryOp(type)) {
+        BinaryOp *bop = &cellData->function.data.binaryOps;
+        if (bop->first.type == OPERAND_CELL) {
+            push(&XCL[bop->first.data.cell.row][bop->first.data.cell.col].dependents, cell);
         }
-        case MIN_FUNCTION:
-        case MAX_FUNCTION:
-        case AVG_FUNCTION:
-        case SUM_FUNCTION:
-        case STDEV_FUNCTION: {
-            RangeFunction *rangeFunc = &cellData->function.data.rangeFunctions;
-            for (int i = rangeFunc->topLeft.row; i <= rangeFunc->bottomRight.row; i++) {
-                for (int j = rangeFunc->topLeft.col; j <= rangeFunc->bottomRight.col; j++) {
-                    Cell dep = {i, j};
-                    push(&cellData->dependencies, dep);
-                    push(&XCL[i][j].dependents, cell);
-                }
-            }
-            break;
+        if (bop->second.type == OPERAND_CELL) {
+            push(&XCL[bop->second.data.cell.row][bop->second.data.cell.col].dependents, cell);
         }
 
-        case SLEEP_FUNCTION: {
-            Operand *sleepValue = &cellData->function.data.sleep_value;
-            if (sleepValue->type == OPERAND_CELL) {
-                push(&cellData->dependencies, sleepValue->data.cell);
-                push(&XCL[sleepValue->data.cell.row][sleepValue->data.cell.col].dependents, cell);
+    } else if (isRangeFunction(type)) {
+        RangeFunction *rangeFunc = &cellData->function.data.rangeFunctions;
+        for (int i = rangeFunc->topLeft.row; i <= rangeFunc->bottomRight.row; i++) {
+            for (int j = rangeFunc->topLeft.col; j <= rangeFunc->bottomRight.col; j++) {
+                push(&XCL[i][j].dependents, cell);
             }
-            break;
         }
 
-        default:
-            break;
+    } else if (type == SLEEP_FUNCTION) {
+        Operand *sleepValue = &cellData->function.data.sleep_value;
+        if (sleepValue->type == OPERAND_CELL) {
+            push(&XCL[sleepValue->data.cell.row][sleepValue->data.cell.col].dependents, cell);
+        }
     }
 }
 
@@ -171,10 +172,10 @@ static void setDirtyParents(Cell cell, Vec* stack) {
     push(stack,cell);
     XCL[cell.row][cell.col].dirty_parents = 0;
 
-    while(stack->size) {
+    while(getSize(stack)) {
         Cell top = pop(stack);
         Vec* children = &XCL[top.row][top.col].dependents;
-        for (int i = 0; i < children->size; ++i) {
+        for (int i = 0; i < getSize(children); ++i) {
             Cell child = get(children, i);
             CellData *childData = &XCL[child.row][child.col];
 
@@ -192,12 +193,12 @@ static void setDirtyParents(Cell cell, Vec* stack) {
 static void update_dependants(Cell cell) {
 
     CellData *cellData = &XCL[cell.row][cell.col];
-    Vec stack = newVec(cellData->dependents.size);
+    Vec stack = newVec(getSize(&cellData->dependents));
     setDirtyParents(cell, &stack);
 
     //doing this for root out of the main loop to
     //avoid re calculating the root twice
-    for (int i = 0; i < cellData->dependents.size; ++i) {
+    for (int i = 0; i < getSize(&cellData->dependents); ++i) {
         Cell child = get(&cellData->dependents, i);
         CellData* childData = &XCL[child.row][child.col];
         childData->dirty_parents--;
@@ -206,12 +207,12 @@ static void update_dependants(Cell cell) {
         }
     }
 
-    while (stack.size) {
+    while (getSize(&stack)) {
         Cell top = pop(&stack);
         CellData *topCell = &XCL[top.row][top.col];
         topCell->value = evaluateExpression(&topCell->function, &topCell->error);
 
-        for (int i = 0; i < topCell->dependents.size; ++i) {
+        for (int i = 0; i < getSize(&topCell->dependents); ++i) {
             Cell child = get(&topCell->dependents, i);
             CellData* childData = &XCL[child.row][child.col];
             childData->dirty_parents--;
@@ -258,28 +259,31 @@ ExpressionError setCellValue(Cell cell, char *expression) {
         return COULD_NOT_PARSE;
     }
 
+
+    CellData *cellData = &XCL[cell.row][cell.col];
+
+    // 1. Save copy of old function
+    Function oldFunction = cellData->function;
+
     // Shortcut if the entered function was a constant function
     // or can be evaluated to a constant
-    CellData *cellData = &XCL[cell.row][cell.col];
     if(isExpressionConstant(&newFunction)){
         cellData->value = evaluateExpression(&newFunction, &cellData->error);
         cellData->function = constantFunction(cellData->value);
-        update_graph(cell);
+        update_graph(cell, &oldFunction);
         update_dependants(cell);
         return NONE;
     }
 
-    // 1. Save old function
-    Function oldFunction = cellData->function;
 
     // 2. Update graph
     cellData->function = newFunction;
-    update_graph(cell);
+    update_graph(cell, &oldFunction);
 
     // Check for circular dependency
     if (checkCircularDependency(cell)) {
         cellData->function = oldFunction;
-        update_graph(cell);
+        update_graph(cell, &newFunction);
         return CIRCULAR_DEPENDENCY;
     }
 
@@ -325,6 +329,7 @@ static int evaluateExpression(Function *func, CellError *error) {
         case CONSTANT:
             *error = NO_ERROR;
             return func->data.value;
-
     }
+    printf("ExpressionError has an invalid value\n");
+    exit(-1);
 }

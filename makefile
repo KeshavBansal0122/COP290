@@ -1,14 +1,15 @@
 # Example Makefile content:
 CC = gcc
-CFLAGS = -Wall -Wextra -O3
-CFLAGS =
+CFLAGS = -Wall -Wextra -O3 -flto
+#CFLAGS =
 LDFLAGS = -lm -flto
 TEST_CFLAGS = $(CFLAGS) -I./tests
 
 SRC_DIR = src
 TEST_DIR = tests
-BUILD_DIR = build
-TEST_BUILD_DIR = build/tests
+BUILD_DIR = target
+RELEASE_DIR = target/release
+TEST_BUILD_DIR = target/tests
 
 SRCS = $(wildcard $(SRC_DIR)/*.c)
 TEST_SRCS = $(wildcard $(TEST_DIR)/*.c)
@@ -19,7 +20,7 @@ TEST_OBJS = $(TEST_SRCS:$(TEST_DIR)/%.c=$(TEST_BUILD_DIR)/%.o)
 MAIN_OBJ = $(BUILD_DIR)/main.o
 LIB_OBJS = $(filter-out $(MAIN_OBJ),$(OBJS))
 
-TARGET = sheet
+TARGET = spreadsheet
 TEST_TARGET = run_tests
 
 .PHONY: all clean test check
@@ -27,11 +28,11 @@ TEST_TARGET = run_tests
 all: $(BUILD_DIR)/$(TARGET)
 
 $(BUILD_DIR)/$(TARGET): $(OBJS)
-	@mkdir -p $(BUILD_DIR)
-	$(CC) $(OBJS) $(LDFLAGS) -o $@
+	@mkdir -p ${RELEASE_DIR}
+	$(CC) $(OBJS) $(LDFLAGS) -o ${RELEASE_DIR}/$(TARGET)
 
 $(BUILD_DIR)/%.o: $(SRC_DIR)/%.c
-	@mkdir -p $(BUILD_DIR)
+	@mkdir -p ${RELEASE_DIR}
 	$(CC) $(CFLAGS) -c $< -o $@
 
 $(TEST_BUILD_DIR)/%.o: $(TEST_DIR)/%.c

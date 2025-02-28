@@ -9,7 +9,7 @@
 
 
 typedef enum {
-    NO_ERROR,
+    NO_ERROR = 0,
     DIVIDE_BY_ZERO,
     DEPENDENCY_ERROR // depends on cell which has div by zero
 } CellError;
@@ -17,8 +17,8 @@ typedef enum {
 
 // BinaryOperation is slightly complicated because it can be either a cell or a constant
 typedef enum OperandType {
-    OPERAND_CELL,
-    OPERAND_INT
+    OPERAND_INT,
+    OPERAND_CELL
 } OperandType;
 
 typedef struct Operand {
@@ -41,7 +41,9 @@ typedef struct RangeFunction {
 
 
 typedef enum FunctionType {
-    CONSTANT,
+    // I explicitly mention this because zero initialization should be a
+    // valid state
+    CONSTANT = 0,
     MIN_FUNCTION,
     MAX_FUNCTION,
     AVG_FUNCTION,
@@ -64,26 +66,33 @@ typedef struct Function {
     } data;
 } Function;
 
+bool isRangeFunction(FunctionType type);
+bool isBinaryOp(FunctionType type);
+
+
+/*
+ * Stores the cell and the graph data
+ * The parents ie the dependencies are not stored directly
+ * but can be inferred from the function object
+ * */
 typedef struct CellData {
-    int value;
     /**
-     * Needs recalculation
+     * The children
      */
     Vec dependents;
     /**
      * Cells that this cell depends on
      */
-    Vec dependencies;
     Function function;
     CellError error;
     /**
      * The number of parents that need to be recalculated before this one can be
      */
-    size_t dirty_parents;
+    int dirty_parents;
+    int value;
     /**
      * Useful for DFS
      * */
-     bool found;
 } CellData;
 
 

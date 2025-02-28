@@ -144,7 +144,7 @@ char *function_to_string(Function *func) {
         }
 
         default:
-            sprintf(result, "Unknown Function Type");
+            sprintf(result, "Unknown Function Type, type = %d", func->type);
     }
 
     return result;

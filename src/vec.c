@@ -8,24 +8,38 @@
 
 Vec newVec(const int capacity) {
     Vec vec;
-    if (capacity > 0) {
+    if (capacity > STACK_ARRAY_LEN) {
         vec.data = malloc(sizeof(Cell) * capacity);
         if (!vec.data) {
             perror("Failed to allocate memory for vector");
             exit(EXIT_FAILURE);
         }
+        vec._size = 0;
+        vec.capacity = capacity;
+    } else {
+        vec.capacity = 0;
     }
-    vec.size = 0;
-    vec.capacity = capacity;
     return vec;
 }
 
-void resize(Vec* vec) {
-    if (vec->capacity == 0) {
-        vec->capacity = 1;
-        vec->data = malloc(sizeof(Cell) * vec->capacity);
-        return;
+void move_to_heap(Vec* vec) {
+    Cell* data = malloc(sizeof(Cell) * 8);
+    if (!data) {
+        perror("Failed to allocate memory for vector");
+        exit(EXIT_FAILURE);
     }
+    for (int i = 0; i < vec->capacity; i++) {
+        data[i] = vec->stack_data[i];
+    }
+
+    // need to be careful, can only set these values after the data has been copied
+    vec->capacity = 8;
+    vec->_size = STACK_ARRAY_LEN;
+    vec->data = data;
+
+}
+
+void resize(Vec* vec) {
     int newCapacity = vec->capacity * 2;
     Cell* newData = realloc(vec->data, sizeof(Cell) * newCapacity);
     if (!newData) {
@@ -37,52 +51,97 @@ void resize(Vec* vec) {
 }
 
 void push(Vec* vec, Cell data) {
-    if (vec->size == vec->capacity) {
+    //for stack-based vector
+    if (vec->capacity < STACK_ARRAY_LEN) {
+        vec->stack_data[vec->capacity++] = data;
+        return;
+    }
+    if (vec->capacity == STACK_ARRAY_LEN) {
+        move_to_heap(vec);
+    }
+
+    //for heap-based vector
+    if (vec->_size == vec->capacity) {
         resize(vec);
     }
-    vec->data[vec->size++] = data;
+    vec->data[vec->_size++] = data;
 }
 
 Cell pop(Vec* vec) {
-    if (vec->size == 0) {
+
+    if (vec->capacity == 0 || (vec->capacity > STACK_ARRAY_LEN && vec->_size == 0)) {
         printf("Vector is empty\n");
         exit(EXIT_FAILURE);
     }
-    vec->size--;
-    return vec->data[vec->size];
+
+    if (vec->capacity <= STACK_ARRAY_LEN) {
+        vec->capacity--;
+        return vec->stack_data[vec->capacity];
+
+    } else {
+        vec->_size--;
+        return vec->data[vec->_size];
+    }
 }
 
 Cell get(const Vec* vec, int index) {
-    if (index >= vec->size) {
-        fprintf(stderr, "Index out of bounds: %lu\n", index);
-        exit(EXIT_FAILURE);
+    if (vec->capacity <= STACK_ARRAY_LEN) {
+        if (index >= vec->capacity) {
+            fprintf(stderr, "Index out of bounds: %d\n", index);
+            exit(EXIT_FAILURE);
+        }
+        return vec->stack_data[index];
+    } else {
+        if (index >= vec->_size) {
+            fprintf(stderr, "Index out of bounds: %d\n", index);
+            exit(EXIT_FAILURE);
+        }
+        return vec->data[index];
     }
-    return vec->data[index];
 }
 
 // Function to get the size of the vector
 int getSize(const Vec* vec) {
-    return vec->size;
+    if (vec->capacity <= STACK_ARRAY_LEN) {
+        return vec->capacity;
+    }
+    return vec->_size;
 }
 
 void clear(Vec* vec) {
-    vec->size = 0;
+    if (vec->capacity <= STACK_ARRAY_LEN) {
+        vec->capacity = 0;
+    } else {
+        vec->_size = 0;
+    }
 }
 
 void removeAt(Vec* vec, int index) {
-    if (index >= vec->size) {
-        fprintf(stderr, "Index out of bounds: %lu\n", index);
-        exit(EXIT_FAILURE);
+    if (vec->capacity <= STACK_ARRAY_LEN) {
+        if (index >= vec->capacity) {
+            fprintf(stderr, "Index out of bounds: %d\n", index);
+            exit(EXIT_FAILURE);
+        }
+        for (int i = index; i < vec->capacity - 1; i++) {
+            vec->stack_data[i] = vec->stack_data[i + 1];
+        }
+        vec->capacity--;
+    } else {
+        if (index >= vec->_size) {
+            fprintf(stderr, "Index out of bounds: %d\n", index);
+            exit(EXIT_FAILURE);
+        }
+        for (int i = index; i < vec->_size - 1; i++) {
+            vec->data[i] = vec->data[i + 1];
+        }
+        vec->_size--;
     }
-    for (int i = index; i < vec->size - 1; i++) {
-        vec->data[i] = vec->data[i + 1];
-    }
-    vec->size--;
 }
 
 bool removeItem(Vec* vec, Cell item) {
-    for (int i = 0; i < vec->size; i++) {
-        if (vec->data[i].row == item.row && vec->data[i].col == item.col) {
+    for (int i = 0; i < getSize(vec); i++) {
+        Cell cell = get(vec, i);
+        if (cell.row == item.row && cell.col == item.col) {
             removeAt(vec, i);
             return true;
         }
@@ -91,5 +150,7 @@ bool removeItem(Vec* vec, Cell item) {
 }
 
 void freeVec(Vec* vec) {
-    free(vec->data);
+    if (vec->capacity > STACK_ARRAY_LEN) {
+        free(vec->data);
+    }
 }

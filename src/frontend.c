@@ -30,7 +30,7 @@ Cell topLeft;
 char* getLine();
 
 /*
- * Temporary, while parser is being worked on, to allow frontend to compile 
+ * Temporary, while parser is being worked on, to allow frontend to compile
  */
 static size_t next_token(const char *expression) {
     size_t index = 0;
@@ -111,6 +111,7 @@ static Cell parseCellReference(const char *reference, size_t len, bool *success)
     }
     return cell;
 }
+
 
 
 
@@ -199,13 +200,17 @@ bool runFrontendCommand(const char* command) {
     if (command[1] == '\0' ) {
         switch (command[0]) {
             case 'w':
-                if(topLeft.row - MAX_WIDTH >= 0) topLeft.row = topLeft.row - MAX_WIDTH; break;
+                if(topLeft.row - MAX_WIDTH >= 0) topLeft.row = topLeft.row - MAX_WIDTH;
+                break;
             case 's':
-                if(topLeft.row + 2*MAX_WIDTH<= rows) topLeft.row = topLeft.row + MAX_WIDTH; break;
+                if(topLeft.row + 2*MAX_WIDTH<= rows) topLeft.row = topLeft.row + MAX_WIDTH;
+                break;
             case 'd':
-                if(topLeft.col + 2*MAX_WIDTH <= cols) topLeft.col = topLeft.col + MAX_WIDTH; break;
+                if(topLeft.col + 2*MAX_WIDTH <= cols) topLeft.col = topLeft.col + MAX_WIDTH;
+                break;
             case 'a':
-                if(topLeft.col - MAX_FUNCTION >= 0) topLeft.col = topLeft.col - MAX_WIDTH; break;
+                if(topLeft.col - MAX_WIDTH >= 0) topLeft.col = topLeft.col - MAX_WIDTH;
+                break;
             case 'q':
                 exit(0);
             default:
@@ -220,7 +225,7 @@ bool runFrontendCommand(const char* command) {
     } else if (strncmp(command, "scroll_to", 9) == 0 && command[9] == ' ') {
 
         const char* cellAddress = &command[10];
-        int cellLen = next_token(cellAddress);
+        size_t cellLen = next_token(cellAddress);
         if (cellAddress[cellLen] != '\0') {
             printf("Invalid Syntax\n");
             return false;
@@ -310,8 +315,8 @@ _Noreturn void runConsole() {
         printf("[%.1f] (%s) > ", timeTaken, status);
 
         char* buffer = getLine();
-        clock_t start_time, end_time;
-        start_time = clock();
+        struct timespec start, end;
+        clock_gettime(CLOCK_REALTIME, &start);
 
         removeSpaces(buffer);
         if (buffer[0] == '\0') {
@@ -325,9 +330,8 @@ _Noreturn void runConsole() {
             strcpy(status, "err");
         }
         free(buffer);
-
-        end_time = clock();
-        timeTaken = ((double)(end_time - start_time)) / CLOCKS_PER_SEC;
+        clock_gettime(CLOCK_REALTIME, &end);
+        timeTaken = (end.tv_sec - start.tv_sec) + (end.tv_nsec - start.tv_nsec) / 1e9;
         print_board();
     }
 }

@@ -26,6 +26,18 @@ void initBackend(int r, int c) {
     }
 }
 
+void reset() {
+    const Function zero = {};
+    for (int i = 0; i < rows; i++) {
+        for (int j = 0; j < cols; j++) {
+            XCL[i][j].function = zero;
+            XCL[i][j].error = NO_ERROR;
+            freeVec(&XCL[i][j].dependents);
+            XCL[i][j].value = 0;
+        }
+    }
+}
+
 int getCellValue(Cell cell, CellError *error) {
     *error = XCL[cell.row][cell.col].error;
     return XCL[cell.row][cell.col].value;

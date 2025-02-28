@@ -46,7 +46,9 @@ void clear(Vec* vec);
 void removeAt(Vec* vec, int index);
 
 bool removeItem(Vec* vec, Cell item);
+
 /**
- * Free the vector's array
+ * Free the vector's array, the vector
+ * is still in a usable state after this function is called
  */
 void freeVec(Vec* vec);

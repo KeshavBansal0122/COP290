@@ -8,6 +8,14 @@ typedef enum ExpressionError {
     COULD_NOT_PARSE,
 } ExpressionError;
 
+/**
+ * Resets the backend to its initial state, after the init was called
+ * The same grid is still retained, only the data is reset.
+ *
+ * Useful for testing
+ */
+void reset();
+
 void initBackend(int rows, int cols);
 
 /**

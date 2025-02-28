@@ -153,4 +153,5 @@ void freeVec(Vec* vec) {
     if (vec->capacity > STACK_ARRAY_LEN) {
         free(vec->data);
     }
+    vec->capacity = vec->_size=0;
 }

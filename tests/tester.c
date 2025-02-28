@@ -6,6 +6,7 @@
 #include <limits.h>
 #include "../src/parser.h"
 #include "function_printer.h"
+#include "sheetTester.h"
 
 #define MAX_LINE_LENGTH 100
 
@@ -35,7 +36,7 @@ static void removeMaxSpaces(char* str) {
 bool processInvalidLine(char* line) {
     bool success;
     removeMaxSpaces(line);
-    Function func = parseExpression(line, &success);
+    parseExpression(line, &success);
     if (success) {
         fprintf(stderr, "Failed to detect invalid expression: %s\n", line);
     }
@@ -61,6 +62,8 @@ bool processValidLine(char* line, char* ans_line) {
     }
     return true;
 }
+
+
 
 int main(int argc, char* argv[]) {
     printf("Starting parser tester\n");
@@ -140,5 +143,12 @@ int main(int argc, char* argv[]) {
     fclose(file);
 
     printf("Parser test %s\n", success ? "succeeded" : "failed");
+
+    if(success) {
+      printf("starting sheet tests\n");
+      success &= runSheetTests();
+    } else {
+      printf("skipping sheet tests due to parser failing");
+    }
     return success? 0 : 1;
 }

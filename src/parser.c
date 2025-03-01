@@ -71,12 +71,12 @@ Cell parseCellReference(char* reference, bool* success)
         i++;
         length_of_col++;
 
-       // printf("Current column value: %d\n", cell.col);
+       //printf("Current column value: %d\n", cell.col);
 
         // Check if the column name is too long (more than 3 letters, e.g., "AAAA")
         if (length_of_col > 3) 
         {   
-          //  printf("Error: Column length exceeded (more than 3 letters)\n");
+          //printf("Error: Column length exceeded (more than 3 letters)\n");
             *success = false;
             return (Cell){0, 0};  // Return a valid default Cell
         }
@@ -100,14 +100,14 @@ Cell parseCellReference(char* reference, bool* success)
         // Check if row conversion failed
         if (cell.row == -1) 
         {
-           // printf("Error: Invalid row number\n");
+           //printf("Error: Invalid row number\n");
             *success = false;
             return (Cell){0, 0};
         }
     }
     else 
     {
-       // printf("Error: No row digits found\n");
+      // printf("Error: No row digits found\n");
         *success = false;
         return (Cell){0, 0};
     }
@@ -115,7 +115,7 @@ Cell parseCellReference(char* reference, bool* success)
     // Validate row range
     if (cell.row >= 1000 || cell.row < 0) 
     {
-       // printf("Error: Row out of valid range (0-999)\n");
+       //printf("Error: Row out of valid range (0-999)\n");
         *success = false;
         return (Cell){0, 0};
     }
@@ -249,7 +249,7 @@ bool hasExtraCharsAfterClosingParen(const char *expression) {
 }
 
 bool validateFormatAndExtractRange(const char *expression, Cell *topLeft, Cell *bottomRight, bool *success) {
-   // printf("Validating expression: %s\n", expression);
+   //printf("Validating expression: %s\n", expression);
 
     int length = strlen(expression);
     //printf("Expression length: %d\n", length);
@@ -262,7 +262,7 @@ bool validateFormatAndExtractRange(const char *expression, Cell *topLeft, Cell *
 
     const char *start_pointer = expression + 4; // Skip "MIN(", "MAX(", etc.
     if (*start_pointer == '\0') { // Safety check
-        //printf("Error: Empty reference after function name\n");
+       // printf("Error: Empty reference after function name\n");
         return false;
     }
 
@@ -271,7 +271,7 @@ bool validateFormatAndExtractRange(const char *expression, Cell *topLeft, Cell *
     int i = 0;
     const char *bottom_right_pointer = NULL;
 
-    // Find the ':' separator
+    //Find the ':' separator
     while (start_pointer[i] != ')' && start_pointer[i] != '\0') {
         if (start_pointer[i] == ':') {
             bottom_right_pointer = start_pointer + i + 1;
@@ -295,7 +295,7 @@ bool validateFormatAndExtractRange(const char *expression, Cell *topLeft, Cell *
 
     // Ensure top-left reference fits safely in the buffer
     if (i >= sizeof(char) * 31) { // 31 characters max, 1 for '\0'
-       // printf("Error: Top-left reference exceeds max length\n");
+       //printf("Error: Top-left reference exceeds max length\n");
         return false;
     }
 
@@ -313,14 +313,15 @@ bool validateFormatAndExtractRange(const char *expression, Cell *topLeft, Cell *
     char bottom_right_reference[32];
     strncpy(bottom_right_reference, bottom_right_pointer, sizeof(bottom_right_reference) - 1);
     bottom_right_reference[sizeof(bottom_right_reference) - 1] = '\0'; // Ensure null termination
-   // printf("Extracted bottom-right reference: %s\n", bottom_right_reference);
+    //printf("Extracted bottom-right reference: %s\n", bottom_right_reference);
 
     // Parse the cell references
+    //printf("this has reached");
     *topLeft = parseCellReference(top_left_reference, success);
     //printf("Parsed topLeft: col=%d, row=%d (success=%d)\n", topLeft->col, topLeft->row, *success);
 
     if (!*success) {
-       // printf("Error: Failed to parse top-left reference\n");
+      // printf("Error: Failed to parse top-left reference\n");
         return false; // Stop if top-left parsing fails
     }
 
@@ -482,7 +483,16 @@ Function parseExpression(char* expression, bool* success)
 
             char *bottom_right_reference = bottom_right_pointer;
             topLeft = parseCellReference(top_left_reference, success);
+            if(!(*success))
+            {
+                return ans_funct;
+            }
+
             bottomRight = parseCellReference(bottom_right_reference, success);
+            if(!(*success))
+            {
+                return ans_funct;
+            }
 
             ans_funct.data.rangeFunctions.topLeft = topLeft;
             ans_funct.data.rangeFunctions.bottomRight = bottomRight;

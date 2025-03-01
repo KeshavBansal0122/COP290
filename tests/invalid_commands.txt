@@ -6,6 +6,7 @@ SUM((A1:B2)
 STDEV(A1::B2)
 STDE(A1::B2)
 STDV(A1::B2)
+STDEV(A1-B2)
 1 + A1A
 1 + A1A1
 1 + -A1
@@ -21,3 +22,4 @@ SUM(1)
 SUM(A1BB2)
 A1:B2 + 1
 A1(A2)
+B1 + A

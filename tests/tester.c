@@ -34,18 +34,18 @@ static void removeMaxSpaces(char* str) {
 
 
 bool processInvalidLine(char* line) {
+	printf("Testing invalid line: %s\n", line);
     bool success;
     removeMaxSpaces(line);
     parseExpression(line, &success);
     if (success) {
         fprintf(stderr, "Failed to detect invalid expression: %s\n", line);
-    } else {
-		printf("Successfully detected invalid expression: %s\n", line);
     }
     return !success;
 }
 
 bool processValidLine(char* line, char* ans_line) {
+ 	printf("Testing valid line: %s\n", line);
     bool success;
     char line2[MAX_LINE_LENGTH];
     strcpy(line2, line);
@@ -61,8 +61,6 @@ bool processValidLine(char* line, char* ans_line) {
         fprintf(stderr, "Parsed: %s\n", result);
         fprintf(stderr, "Expected: %s\n", ans_line);
         return false;
-    } else {
-    	printf("Successfully parsed valid expression: %s\n", line);
     }
     return true;
 }

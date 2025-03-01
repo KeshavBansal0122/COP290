@@ -23,7 +23,7 @@ LIB_OBJS = $(filter-out $(MAIN_OBJ),$(OBJS))
 TARGET = spreadsheet
 TEST_TARGET = run_tests
 
-.PHONY: all clean test check
+.PHONY: all clean test testfile
 
 all: $(BUILD_DIR)/$(TARGET)
 
@@ -43,9 +43,9 @@ $(TEST_BUILD_DIR)/$(TEST_TARGET): $(TEST_OBJS) $(LIB_OBJS)
 	@mkdir -p $(TEST_BUILD_DIR)
 	$(CC) $(TEST_OBJS) $(LIB_OBJS) $(LDFLAGS) -o $@
 
-test: $(TEST_BUILD_DIR)/$(TEST_TARGET)
+testfile: $(TEST_BUILD_DIR)/$(TEST_TARGET)
 
-check: test
+test: testfile
 	./$(TEST_BUILD_DIR)/$(TEST_TARGET) ./tests/invalid_commands.txt ./tests/valid_commands.txt
 
 clean:

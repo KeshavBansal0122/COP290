@@ -232,6 +232,7 @@ bool validateFormatAndExtractRange(const char *expression, Cell *topLeft, Cell *
     if (expression[length - 1] != ')') {
         return false;
     }
+    
 
     const char *start_pointer = expression + 4; // Skip "MIN(", "MAX(", etc.
     if (*start_pointer == '\0') { // Safety check
@@ -248,6 +249,11 @@ bool validateFormatAndExtractRange(const char *expression, Cell *topLeft, Cell *
             break;
         }
         i++;
+    }
+
+    if(start_pointer[i+1] != '\0')
+    {
+        return false;
     }
 
     // If no ':' found or empty bottom-right reference, invalid format
@@ -277,12 +283,12 @@ bool validateFormatAndExtractRange(const char *expression, Cell *topLeft, Cell *
     *topLeft = parseCellReference(top_left_reference, success);
     //debug
     //printf("topLeft: %d %d\n", topLeft->col, topLeft->row);
-    //if (!*success) return false; // Stop if top-left parsing fails
+    if (!*success) return false; // Stop if top-left parsing fails
 
     *bottomRight = parseCellReference(bottom_right_reference, success);
     //debug
     //printf("bottomRight: %d %d\n", bottomRight->col, bottomRight->row);
-   // if (!*success) return false; // Stop if bottom-right parsing fails
+   if (!*success) return false; // Stop if bottom-right parsing fails
 
     return true;
 }
@@ -421,6 +427,12 @@ Function parseExpression(char* expression, bool* success)
             i++;
         }
 
+        if(start_pointer[i+1] != '\0')
+        {
+            *success = false;
+            return ans_funct;
+        }
+
         if (bottom_right_pointer) 
         {
             char top_left_reference[i + 1];
@@ -473,7 +485,6 @@ Function parseExpression(char* expression, bool* success)
                 {
                 case '+':
                     ans_funct.type = PLUS_OP;
-                    /* code */
                     break;
                 
                 case '-':   

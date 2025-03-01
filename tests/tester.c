@@ -34,32 +34,32 @@ static void removeMaxSpaces(char* str) {
 
 
 bool processInvalidLine(char* line) {
-	printf("Testing invalid line: %s\n", line);
+	ffprintf(stderr, stderr, "Testing invalid line: %s\n", line);
     bool success;
     removeMaxSpaces(line);
     parseExpression(line, &success);
     if (success) {
-        fprintf(stderr, "Failed to detect invalid expression: %s\n", line);
+        ffprintf(stderr, stderr, "Failed to detect invalid expression: %s\n", line);
     }
     return !success;
 }
 
 bool processValidLine(char* line, char* ans_line) {
- 	printf("Testing valid line: %s\n", line);
+ 	ffprintf(stderr, stderr, "Testing valid line: %s\n", line);
     bool success;
     char line2[MAX_LINE_LENGTH];
     strcpy(line2, line);
     removeMaxSpaces(line2);
     Function func = parseExpression(line2, &success);
     if (!success) {
-        fprintf(stderr, "Failed to parse valid expression: %s\n", line);
+        ffprintf(stderr, stderr, "Failed to parse valid expression: %s\n", line);
         return false;
     }
     char* result = function_to_string(&func);
     if (strcmp(result, ans_line) != 0) {
-        fprintf(stderr, "Mismatch in parsing: %s\n", line);
-        fprintf(stderr, "Parsed: %s\n", result);
-        fprintf(stderr, "Expected: %s\n", ans_line);
+        ffprintf(stderr, stderr, "Mismatch in parsing: %s\n", line);
+        ffprintf(stderr, stderr, "Parsed: %s\n", result);
+        ffprintf(stderr, stderr, "Expected: %s\n", ans_line);
         return false;
     }
     return true;
@@ -68,13 +68,13 @@ bool processValidLine(char* line, char* ans_line) {
 
 
 int main(int argc, char* argv[]) {
-    printf("Starting parser tester\n");
+    fprintf(stderr, "Starting parser tester\n");
     FILE *file;
     char line[MAX_LINE_LENGTH];
     char ans_line[MAX_LINE_LENGTH];
 
 
-//    parserSetSize(INT_MAX, INT_MAX);
+    parserSetSize(INT_MAX, INT_MAX);
     bool success = true;
 
     char* invalidCommands = argv[1];
@@ -85,13 +85,13 @@ int main(int argc, char* argv[]) {
      *
      * */
     // Open the file
-    printf("Processing invalid commands, Checking if all these give error\n");
+    fprintf(stderr, "Processing invalid commands, Checking if all these give error\n");
     file = fopen(invalidCommands, "r");
 
     // Check if file exists
     if (file == NULL) {
-        fprintf(stderr, "Error opening Invalid commands file!\n");
-        fprintf(stderr, "provided path was: %s\n", invalidCommands);
+        ffprintf(stderr, stderr, "Error opening Invalid commands file!\n");
+        ffprintf(stderr, stderr, "provided path was: %s\n", invalidCommands);
         return 1;
     }
 
@@ -115,12 +115,12 @@ int main(int argc, char* argv[]) {
      * Process valid commands
      *
      * */
-    printf("Processing valid commands, and comparing output\n");
+    fprintf(stderr, "Processing valid commands, and comparing output\n");
     file = fopen(validCommands, "r");
 
     if (file == NULL) {
-        fprintf(stderr, "Error opening valid commands file!\n");
-        fprintf(stderr, "provided path was: %s\n", validCommands);
+        ffprintf(stderr, stderr, "Error opening valid commands file!\n");
+        ffprintf(stderr, stderr, "provided path was: %s\n", validCommands);
         return 1;
     }
 
@@ -144,13 +144,13 @@ int main(int argc, char* argv[]) {
     }
     fclose(file);
 
-    printf("Parser test %s\n", success ? "succeeded" : "failed");
+    fprintf(stderr, "Parser test %s\n", success ? "succeeded" : "failed");
 
     if(success) {
-      printf("starting sheet tests\n");
+      fprintf(stderr, "starting sheet tests\n");
       success &= runSheetTests();
     } else {
-      printf("skipping sheet tests due to parser failing");
+      fprintf(stderr, "skipping sheet tests due to parser failing");
     }
     return success? 0 : 1;
 }

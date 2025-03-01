@@ -74,7 +74,7 @@ int main(int argc, char* argv[]) {
     char ans_line[MAX_LINE_LENGTH];
 
 
-    parserSetSize(INT_MAX, INT_MAX);
+//    parserSetSize(INT_MAX, INT_MAX);
     bool success = true;
 
     char* invalidCommands = argv[1];

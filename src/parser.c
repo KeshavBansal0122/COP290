@@ -240,7 +240,7 @@ bool hasExtraCharsAfterClosingParen(const char *expression) {
     }
 
     // Check if there are any extra characters after the closing parenthesis
-    if(expression[i+1] != '\0') {
+    if(expression[i] != '\0') {
         //printf("Extra characters found after closing parenthesis: %s\n", expression + i);
         return true;
     }
@@ -282,6 +282,10 @@ bool validateFormatAndExtractRange(const char *expression, Cell *topLeft, Cell *
     }
 
    *success = !(hasExtraCharsAfterClosingParen(expression));
+   if(!*success)
+   {
+       return false;
+   }
 
     // If no ':' found or empty bottom-right reference, invalid format
     if (!bottom_right_pointer || *bottom_right_pointer == ')' || *bottom_right_pointer == '\0') {
@@ -464,9 +468,9 @@ Function parseExpression(char* expression, bool* success)
             i++;
         }
 
-        if(start_pointer[i+1] != '\0')
+        *success = !(hasExtraCharsAfterClosingParen(expression));
+        if(!*success)
         {
-            *success = false;
             return ans_funct;
         }
 
@@ -489,6 +493,12 @@ Function parseExpression(char* expression, bool* success)
         if (expression[length - 1] != ')' || expression[4]!='V' || expression[5]!='(') 
         {   
             *success = false;
+            return ans_funct;
+        }
+
+        *success = !(hasExtraCharsAfterClosingParen(expression));
+        if(!*success)
+        {
             return ans_funct;
         }
 

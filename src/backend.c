@@ -222,6 +222,8 @@ static void update_dependants(Cell cell, int oldValue) {
     while (getSize(&stack)) {
         Cell top = pop(&stack);
         CellData *topCell = &XCL[top.row][top.col];
+        
+        topCell->value = evaluateExpression(&topCell->function, &topCell->error);
 
         for (int i = 0; i < getSize(&topCell->dependents); ++i) {
             Cell child = get(&topCell->dependents, i);

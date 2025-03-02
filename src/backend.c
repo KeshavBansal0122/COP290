@@ -223,23 +223,6 @@ static void update_dependants(Cell cell, int oldValue) {
         Cell top = pop(&stack);
         CellData *topCell = &XCL[top.row][top.col];
 
-        if (topCell->function.type == SUM_FUNCTION) {
-            topCell-> value += cellData->value - oldValue;
-        }
-        else if(topCell->function.type == MIN_FUNCTION){
-            if(cellData->value < topCell->value){
-                topCell->value = cellData->value;
-            }
-        }
-        else if(topCell->function.type == MAX_FUNCTION){
-            if(cellData->value > topCell->value){
-                topCell->value = cellData->value;
-            }
-        }
-        else {
-            topCell->value = evaluateExpression(&topCell->function, &topCell->error);
-        }
-
         for (int i = 0; i < getSize(&topCell->dependents); ++i) {
             Cell child = get(&topCell->dependents, i);
             CellData* childData = &XCL[child.row][child.col];

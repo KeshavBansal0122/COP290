@@ -11,7 +11,7 @@
 #include <time.h>
 
 #include "backend.h"
-// #include "parser.h"
+#include "parser.h"
 
 #define MAX_WIDTH 10
 
@@ -28,92 +28,6 @@ static bool doPrint = false;
 Cell topLeft;
 
 char* getLine();
-
-/*
- * Temporary, while parser is being worked on, to allow frontend to compile
- */
-static size_t next_token(const char *expression) {
-    size_t index = 0;
-
-    if (expression[index] == '\0') { // End of string, no tokens left
-        return index;
-    }
-
-    if (isalnum(expression[index])) {
-        while (expression[index] && isalnum(expression[index])) {
-            index++;
-        }
-    } else {
-        // It's a single special character
-        index++;
-    }
-
-    return index;
-}
-
-static int convert_to_int(const char* expression, size_t len, bool* success) {
-    int result = 0;
-    int i = 0;
-    int multiplier = 1;
-    if(expression[i] == '+') {
-        i++;
-        if(i == len) {
-            *success = false;
-            return 0;
-        }
-    }
-    if(expression[i] == '-') {
-        multiplier = -1;
-        i++;
-        if(i == len) {
-            *success = false;
-            return 0;
-        }
-    }
-
-    while (i < len && expression[i] >= '0' && expression[i] <= '9')
-    {
-        result = result * 10 + (expression[i] - '0');
-        i++;
-    }
-
-    *success = i == len;
-
-    return result * multiplier;
-}
-
-static Cell parseCellReference(const char *reference, size_t len, bool *success) {
-    Cell cell = {0, 0};
-    int i = 0;
-
-    // Parse column (letters)
-    while (i < len && reference[i] >= 'A' && reference[i] <= 'Z')
-    {
-        cell.col = cell.col * 26 + (reference[i] - 'A' + 1);  // Convert letters to column index
-        i++;
-    }
-
-
-    if (i == len) {
-        *success = false;
-        return cell;
-    }
-
-    // Parse row (numbers)
-    if (reference[i] >= '0' && reference[i] <= '9')
-    {
-        cell.row = convert_to_int(&reference[i], len - i, success);  // Convert digits to row number
-    }
-
-    cell.row--;cell.col--;
-    if (cell.row < 0 || cell.row >= rows || cell.col < 0 || cell.col >= cols) {
-        *success = false;
-    }
-    return cell;
-}
-
-
-
 
 
 /**
@@ -339,7 +253,7 @@ _Noreturn void runConsole() {
 void initFrontend(int row, int col) {
     rows = row;
     cols = col;
-    // parserSetSize(row, col);
+    parserSetSize(row, col);
     initBackend(row, col);
     topLeft.row = 0;
     topLeft.col = 0;

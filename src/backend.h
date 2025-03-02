@@ -9,10 +9,8 @@ typedef enum ExpressionError {
 } ExpressionError;
 
 /**
- * Resets the backend to its initial state, after the init was called
- * The same grid is still retained, only the data is reset.
- *
- * Useful for testing
+ * Resets the backend to its initial state, after the init was calledf
+ * The same grid is still retained, only the data is reset
  */
 void reset();
 

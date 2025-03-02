@@ -182,7 +182,7 @@ bool div0Test() {
 
 bool runSheetTests() {
     initBackend(100, 100);
-//    parserSetSize(100, 100);
+    parserSetSize(100, 100);
     bool success = true;
     fprintf(stderr, "Starting cycle detection check\n");
     success &= cycleDetectionTest();

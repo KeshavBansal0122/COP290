@@ -40,6 +40,8 @@ bool processInvalidLine(char* line) {
     parseExpression(line, &success);
     if (success) {
         fprintf(stderr, "Failed to detect invalid expression: %s\n", line);
+    } else {
+		printf("Successfully detected invalid expression: %s\n", line);
     }
     return !success;
 }
@@ -61,6 +63,8 @@ bool processValidLine(char* line, char* ans_line) {
         fprintf(stderr, "Parsed: %s\n", result);
         fprintf(stderr, "Expected: %s\n", ans_line);
         return false;
+    } else {
+    	printf("Successfully parsed valid expression: %s\n", line);
     }
     return true;
 }
@@ -74,7 +78,7 @@ int main(int argc, char* argv[]) {
     char ans_line[MAX_LINE_LENGTH];
 
 
-//    parserSetSize(INT_MAX, INT_MAX);
+    parserSetSize(INT_MAX, INT_MAX);
     bool success = true;
 
     char* invalidCommands = argv[1];

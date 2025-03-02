@@ -128,7 +128,6 @@ bool runFrontendCommand(const char* command) {
             case 'q':
                 exit(0);
             default:
-                printf("Unknown Command\n"); return false;
         }
         return true;
     }
@@ -141,20 +140,17 @@ bool runFrontendCommand(const char* command) {
         const char* cellAddress = &command[10];
         size_t cellLen = next_token(cellAddress);
         if (cellAddress[cellLen] != '\0') {
-            printf("Invalid Syntax\n");
             return false;
         }
         bool success;
 
         Cell cell = parseCellReference(cellAddress, cellLen, &success);
         if (!success) {
-            printf("Could not parse\n");
             return false;
         }
 
         topLeft = cell;
     } else {
-        printf("Unknown Command\n");
         return false;
     }
     return true;
@@ -191,12 +187,10 @@ bool runCommand(char* command) {
         Cell cell = parseCellReference(command, cellLen, &success);
         if (!success) {
             command[cellLen] = '\0';
-            printf("Cell %s not in range\n", command);
             return false;
         }
 
         if (command[cellLen] != '=') {
-            printf("Invalid Syntax\n");
             return false;
         }
 
@@ -205,13 +199,10 @@ bool runCommand(char* command) {
             case NONE:
                 return true;
             case COULD_NOT_PARSE:
-                printf("Could not parse expression\n");
                 return false;
             case CIRCULAR_DEPENDENCY:
-                printf("Circular Dependency\n");
                 return false;
             default:
-                printf("ExpressionError has an invalid value\n");
                 return false;
         }
 

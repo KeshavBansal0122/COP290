@@ -3,705 +3,323 @@
 
 #include "structs.h"
 #include <string.h>
-#include <stdlib.h>
-#include <stdio.h>
+#include <ctype.h>
 
+static int rows, cols;
 
+size_t next_token(const char *expression) {
+    size_t index = 0;
+
+    if (expression[index] == '\0') { // End of string, no tokens left
+        return index;
+    }
+
+    if (isalnum(expression[index])) {
+        while (expression[index] && isalnum(expression[index])) {
+            index++;
+        }
+    } else {
+        // It's a single special character
+        index++;
+    }
+
+    return index;
+}
 
 /**
- *
- * @param cell The text format like A1
- * @return The cell object
- */
-Cell getCell(const char* cell);
-
-/**
- * @param cell
- * @return Text format of the cell like A1
- */
-char* getCellString(Cell cell);
-/**
- *
- * @param cell
- * @return
- */
-char* getCellString(Cell cell);
-/**
- * Parses the expression, to which a Cell is set into a function object
- * @param expression The part after the = sign
- * @param success Whether the parsing was successful
- */
-
-//helper functions for parseexpression 
-int convert_to_int(char* expression) 
-{
+ * supports only a single leading + or - sign
+ * */
+int convert_to_int(const char* expression, size_t len, bool* success) {
     int result = 0;
-    int i = 0;
+    size_t i = 0;
+    int multiplier = 1;
+    if(expression[i] == '+') {
+        i++;
+        if(i == len) {
+            *success = false;
+            return 0;
+        }
+    }
+    if(expression[i] == '-') {
+        multiplier = -1;
+        i++;
+        if(i == len) {
+            *success = false;
+            return 0;
+        }
+    }
 
-    while (expression[i] >= '0' && expression[i] <= '9') 
+    while (i < len && expression[i] >= '0' && expression[i] <= '9')
     {
         result = result * 10 + (expression[i] - '0');
         i++;
     }
 
-    if(expression[i]!='\0' && expression[i]!=')')
-    {
-        //printf("expression[i]: %c\n", expression[i]);
-        return -1;
-    }
+    *success = i == len;
 
-    return result;
+    return result * multiplier;
 }
 
-// Helper function to parse a cell reference
-Cell parseCellReference(char* reference, bool* success) 
-{
-    Cell cell = {0, 0};  // Ensure initialization
-    int i = 0;
-    int length_of_col = 0;
+void parserSetSize(int row, int col) {
+    rows = row;
+    cols = col;
+}
 
-    *success = true;  // Explicitly initialize success to true
 
-    //printf("Parsing reference: %s\n", reference);
+Cell parseCellReference(const char *reference, size_t len, bool *success) {
+    Cell cell = {0, 0};
+    size_t i = 0;
 
     // Parse column (letters)
-    while (reference[i] >= 'A' && reference[i] <= 'Z') 
+    while (i < len && reference[i] >= 'A' && reference[i] <= 'Z')
     {
         cell.col = cell.col * 26 + (reference[i] - 'A' + 1);  // Convert letters to column index
         i++;
-        length_of_col++;
-
-       //printf("Current column value: %d\n", cell.col);
-
-        // Check if the column name is too long (more than 3 letters, e.g., "AAAA")
-        if (length_of_col > 3) 
-        {   
-          //printf("Error: Column length exceeded (more than 3 letters)\n");
-            *success = false;
-            return (Cell){0, 0};  // Return a valid default Cell
-        }
     }
 
-    // Ensure that at least one letter was parsed
-    if (length_of_col == 0) 
-    {
-        //printf("Error: No column letters found\n");
+
+    if (i == len) {
         *success = false;
-        return (Cell){0, 0};
+        return cell;
+    }
+
+    //to satisfy the inane requirement that A01 should be an invalid cell
+    if (reference[i] == '0') {
+        *success = false;
+        return cell;
     }
 
     // Parse row (numbers)
-    if (reference[i] >= '0' && reference[i] <= '9') 
+    if (reference[i] >= '0' && reference[i] <= '9')
     {
-        cell.row = convert_to_int(&reference[i]);  // Convert digits to row number
-        
-        //printf("Parsed row value: %d\n", cell.row);
-
-        // Check if row conversion failed
-        if (cell.row == -1) 
-        {
-           //printf("Error: Invalid row number\n");
-            *success = false;
-            return (Cell){0, 0};
-        }
+        cell.row = convert_to_int(&reference[i], len - i, success);  // Convert digits to row number
     }
-    else 
-    {
-      // printf("Error: No row digits found\n");
+
+    cell.row--;cell.col--;
+    if (cell.row < 0 || cell.row >= rows || cell.col < 0 || cell.col >= cols) {
         *success = false;
-        return (Cell){0, 0};
     }
-
-    // Validate row range
-    if (cell.row >= 1000 || cell.row < 0) 
-    {
-       //printf("Error: Row out of valid range (0-999)\n");
-        *success = false;
-        return (Cell){0, 0};
-    }
-
-    //printf("Final parsed cell - Column: %d, Row: %d\n", cell.col, cell.row);
-    
     return cell;
 }
 
+Operand parseOperand(const char* expression, size_t len, bool* success) {
+    Operand operand;
+    if (expression[0] >= 'A' && expression[0] <= 'Z') {
+        operand.type = OPERAND_CELL;
+        operand.data.cell = parseCellReference(expression, len, success);
+    } else {
+        operand.type = OPERAND_INT;
+        operand.data.value = convert_to_int(expression, len, success);
+    }
+    return operand;
+}
+
+/**
+ * A default function returned only in the case of error
+ * */
+Function defaultFn() {
+    Function fn;
+    fn.type=CONSTANT;
+    fn.data.value=0;
+    return fn;
+}
+/**
+ * A default range returned only in the case of error
+ * */
+RangeFunction defaultRange() {
+    RangeFunction range;
+    range.topLeft.row = 0;
+    range.topLeft.col = 0;
+    range.bottomRight.row = 0;
+    range.bottomRight.col = 0;
+    return range;
+}
+
 // Helper function to parse binary operation
-BinaryOp parseBinaryOp(char* operand1, char* operand2, bool* success) 
+Function parseBinaryOp(char* operand1, char* remaining, bool* success)
 {
-    // Allocate memory and check for success
-    BinaryOp binaryOp;
-
-    *success = true;  // Start assuming success
-
-    // Operand 1 processing
-    int i = 0;
-    if ((operand1[i] >= '0' && operand1[i] <= '9') || operand1[i] == '-' || operand1[i] == '+') 
-    {
-        (&binaryOp)->first.type = OPERAND_INT;
-        int sign = 1;
-
-        // Handle sign
-        if (operand1[i] == '-') 
-        {
-            sign = -1;
-            i++;
-        }
-        else if (operand1[i] == '+') 
-        {
-            i++;
-        }
-
-        // Convert string to integer
-        int value = 0;
-        while (operand1[i] >= '0' && operand1[i] <= '9') 
-        {
-            value = value * 10 + (operand1[i] - '0');
-            i++;
-        }
-
-        // Ensure valid number conversion
-        if (operand1[i] != '\0') 
-        {
-            *success = false;
-            return binaryOp;
-        }
-
-        (&binaryOp)->first.data.value = sign * value;
-    } 
-    else 
-    {  
-        // Assume it's a cell reference
-        (&binaryOp)->first.type = OPERAND_CELL;
-        (&binaryOp)->first.data.cell = parseCellReference(operand1, success);
-
-        if (!(*success)) 
-        {
-            return binaryOp;
-        }
+    size_t op1len = remaining - operand1;
+    char operation = remaining[0];
+    char* operand2 = remaining + 1;
+    if (*operand2 == '\0') {
+        *success = false;
+        return defaultFn();
     }
-
-    // Operand 2 processing
-    i = 0;
-    if ((operand2[i] >= '0' && operand2[i] <= '9') || operand2[i] == '-' || operand2[i] == '+') 
-    {
-        (&binaryOp)->second.type = OPERAND_INT;
-        int sign = 1;
-
-        if (operand2[i] == '-') 
-        {
-            sign = -1;
-            i++;
-        }
-        else if (operand2[i] == '+') 
-        {
-            i++;
-        }
-
-        int value = 0;
-        while (operand2[i] >= '0' && operand2[i] <= '9') 
-        {
-            value = value * 10 + (operand2[i] - '0');
-            i++;
-        }
-
-        if (operand2[i] != '\0') 
-        {
-            *success = false;
-            return binaryOp;
-        }
-
-        (&binaryOp)->second.data.value = sign * value;
-    } 
-    else 
-    {  
-        // Assume it's a cell reference
-        (&binaryOp)->second.type = OPERAND_CELL;
-        (&binaryOp)->second.data.cell = parseCellReference(operand2, success);
-
-        if (!(*success)) 
-        {
-            return binaryOp;
-        }
-    }
-
-    return binaryOp;
-}
-
-bool hasExtraCharsAfterClosingParen(const char *expression) {
-    int i = 0;
-
-    // Find the first ')' character
-    while (expression[i] != '\0') {
-        if (expression[i] == ')') {
-            i++; // Move past ')'
-            break;
-        }
-        i++;
-    }
-
-    // Check if there are any extra characters after the closing parenthesis
-    if(expression[i] != '\0') {
-        //printf("Extra characters found after closing parenthesis: %s\n", expression + i);
-        return true;
-    }
-
-    return false; // No extra characters found
-}
-
-bool validateFormatAndExtractRange(const char *expression, Cell *topLeft, Cell *bottomRight, bool *success) {
-   //printf("Validating expression: %s\n", expression);
-
-    int length = strlen(expression);
-    //printf("Expression length: %d\n", length);
-
-    // Ensure the expression ends with ')' and has a minimum length
-    if (expression[length - 1] != ')') {
-        //printf("Error: Expression does not end with ')'\n");
-        return false;
-    }
-
-    const char *start_pointer = expression + 4; // Skip "MIN(", "MAX(", etc.
-    if (*start_pointer == '\0') { // Safety check
-       // printf("Error: Empty reference after function name\n");
-        return false;
-    }
-
-    //printf("Start parsing from: %s\n", start_pointer);
-
-    int i = 0;
-    const char *bottom_right_pointer = NULL;
-
-    //Find the ':' separator
-    while (start_pointer[i] != ')' && start_pointer[i] != '\0') {
-        if (start_pointer[i] == ':') {
-            bottom_right_pointer = start_pointer + i + 1;
-            //printf("':' found at position %d, bottom-right starts at: %s\n", i, bottom_right_pointer);
-            break;
-        }
-        i++;
-    }
-
-   *success = !(hasExtraCharsAfterClosingParen(expression));
-   if(!*success)
-   {
-       return false;
-   }
-
-    // If no ':' found or empty bottom-right reference, invalid format
-    if (!bottom_right_pointer || *bottom_right_pointer == ')' || *bottom_right_pointer == '\0') {
-        //printf("Error: Invalid range format, missing ':' or empty bottom-right reference\n");
-        return false;
-    }
-
-    // Ensure top-left reference fits safely in the buffer
-    if (i >= sizeof(char) * 31) { // 31 characters max, 1 for '\0'
-       //printf("Error: Top-left reference exceeds max length\n");
-        return false;
-    }
-
-    char top_left_reference[32]; 
-    strncpy(top_left_reference, start_pointer, i);
-    top_left_reference[i] = '\0'; // Ensure null termination
-    //printf("Extracted top-left reference: %s\n", top_left_reference);
-
-    size_t br_length = strlen(bottom_right_pointer);
-    if (br_length >= 31) { // Avoid buffer overflow
-        //printf("Error: Bottom-right reference exceeds max length\n");
-        return false;
-    }
-
-    char bottom_right_reference[32];
-    strncpy(bottom_right_reference, bottom_right_pointer, sizeof(bottom_right_reference) - 1);
-    bottom_right_reference[sizeof(bottom_right_reference) - 1] = '\0'; // Ensure null termination
-    //printf("Extracted bottom-right reference: %s\n", bottom_right_reference);
-
-    // Parse the cell references
-    //printf("this has reached");
-    *topLeft = parseCellReference(top_left_reference, success);
-    //printf("Parsed topLeft: col=%d, row=%d (success=%d)\n", topLeft->col, topLeft->row, *success);
-
+    Operand op1 = parseOperand(operand1, op1len, success);
     if (!*success) {
-      // printf("Error: Failed to parse top-left reference\n");
-        return false; // Stop if top-left parsing fails
+        return defaultFn();
+    }
+    size_t op2len = next_token(operand2);
+
+    //integer can be preceded by a sign
+    if (operand2[0] == '-' || operand2[0] == '+') {
+        op2len += next_token(operand2);
     }
 
-    *bottomRight = parseCellReference(bottom_right_reference, success);
-    //printf("Parsed bottomRight: col=%d, row=%d (success=%d)\n", bottomRight->col, bottomRight->row, *success);
+    //operand2 should be the end of the string
+    if (operand2[op2len] != '\0') {
+        *success = false;
+        return defaultFn();
+    }
 
+    Operand op2 = parseOperand(operand2, op2len, success);
     if (!*success) {
-        //printf("Error: Failed to parse bottom-right reference\n");
-        return false; // Stop if bottom-right parsing fails
+        return defaultFn();
     }
+    Function fn;
+    fn.data.binaryOps.first = op1;
+    fn.data.binaryOps.second = op2;
 
-    //printf("Validation successful!\n");
-    return true;
+    switch (operation) {
+        case '+': fn.type = PLUS_OP; break;
+        case '-': fn.type = MINUS_OP; break;
+        case '*': fn.type = MULTIPLY_OP; break;
+        case '/': fn.type = DIVIDE_OP; break;
+        default: *success = false;
+    }
+    return fn;
 }
 
+/**
+ * Parses a range and returns the corresponding range.
+ * @param range_expression The beginning of the range, does not include the opening bracket
+ * @param len The len of the range
+ * */
+RangeFunction parseRange(char* range_expression, size_t len, bool* success) {
+    size_t topLeftPart = next_token(range_expression);
+    if (range_expression[topLeftPart] != ':') {
+        *success = false;
+        return defaultRange();
+    }
+    Cell topLeft = parseCellReference(range_expression, topLeftPart, success);
+    if (!*success) {
+        return defaultRange();
+    }
 
+    size_t bottomRightPart = next_token(&range_expression[topLeftPart + 1]);
+    //this should be the len of the expression
+    if (topLeftPart + bottomRightPart + 1 != len) {
+        *success = false;
+        return defaultRange();
+    }
+    Cell bottomRight = parseCellReference(&range_expression[topLeftPart + 1], bottomRightPart, success);
+    if (!*success) {
+        return defaultRange();
+    }
+
+    if(topLeft.row > bottomRight.row || topLeft.col > bottomRight.col) {
+        *success = false;
+        return defaultRange();
+    }
+
+    RangeFunction range = {topLeft, bottomRight};
+    return range;
+}
+
+Function parseFunction(char* expression, size_t bracketStart, bool* success) {
+    *success = true;
+    size_t closeBracket = bracketStart + 1;
+    while(expression[closeBracket] != '\0' && expression[closeBracket] != ')') {
+        closeBracket++;
+    }
+
+    //bracket end should be the end of the expression
+    if(expression[closeBracket] != ')' || expression[closeBracket + 1] != '\0') {
+        *success = false;
+        return defaultFn();
+    }
+
+    //start parsing the function -> name is min 3 or 5 long
+    if(bracketStart != 3 && bracketStart != 5) {
+        *success = false;
+        return defaultFn();
+    }
+
+    Function ans_funct;
+    static char MIN_array[] = "MIN(";
+    static char MAX_array[] = "MAX(";
+    static char AVG_array[] = "AVG(";
+    static char SUM_array[] = "SUM(";
+    static char STDEV_array[] = "STDEV(";
+    static char SLEEP_array[] = "SLEEP(";
+
+    size_t itemStart = bracketStart + 1;
+    size_t range_len = closeBracket - itemStart;
+    if (bracketStart == 3) {
+        //the length of the range string inside the brackets to be parsed
+
+        //set the function type
+        if(strncmp(expression, MIN_array, 4) == 0) {
+            ans_funct.type = MIN_FUNCTION;
+        } else if(strncmp(expression, MAX_array, 4) == 0) {
+            ans_funct.type = MAX_FUNCTION;
+        } else if(strncmp(expression, AVG_array, 4) == 0) {
+            ans_funct.type = AVG_FUNCTION;
+        } else if(strncmp(expression, SUM_array, 4) == 0) {
+            ans_funct.type = SUM_FUNCTION;
+        } else {
+            *success = false;
+            return defaultFn();
+        }
+
+        //all are range functions
+        ans_funct.data.rangeFunctions = parseRange(&expression[itemStart], range_len, success);
+    } else {
+        if(strncmp(expression, STDEV_array, 6) == 0) {
+            ans_funct.type = STDEV_FUNCTION;
+            ans_funct.data.rangeFunctions = parseRange(&expression[itemStart], range_len, success);
+        } else if(strncmp(expression, SLEEP_array, 6) == 0) {
+            ans_funct.type = SLEEP_FUNCTION;
+            ans_funct.data.sleep_value = parseOperand(&expression[itemStart], range_len, success);
+        } else {
+            *success = false;
+            return defaultFn();
+        }
+    }
+
+    return ans_funct;
+
+}
 
 Function parseExpression(char* expression, bool* success)
 {
-  //split into two parts either it is a parenthesis function or not 
-  //read first 4 chars check if it matches given template of functions if yes then it is a function else handle it separately
-  Function ans_funct ;
+    if (expression == NULL || expression[0] == '\0')
+    {
+        *success = false;
+        return defaultFn();
+    }
 
-  char funct_checker_temp_arr[4];
-  char MIN_array[5] = "MIN(";
-  char MAX_array[5] = "MAX(";
-  char AVG_array[5] = "AVG(";
-  char SUM_array[5] = "SUM(";
-  char STDEV_array[5] = "STDE" ;
-  char SLEEP_array[5] = "SLEE";
-  
-  //check whether it is possible to be a parenthesis function (>=4 is the size)
-  int length = 0;
-  while (expression[length] != '\0') 
-  {
-      length++;
-      if (length >= 4) 
-      {
-          break;
+  size_t nextStart = next_token(expression);
+  if (expression[nextStart] == '(') { // A Function
+      return parseFunction(expression, nextStart, success);
+  }
+  //binary operation or constant or identity function are left
+
+  //This sign is a part of the integer
+  if (expression[0] == '-' || expression[0] == '+') {
+      nextStart += next_token(&expression[1]);
+  }
+
+  if (expression[nextStart] == '\0') {
+      //an integer or a constant function
+      Operand op = parseOperand(expression, nextStart, success);
+      if (!*success) {
+          return defaultFn();
       }
-  }
-  
-  //length >=4 implies that it can be a parenthesis function
-  if (length >= 4) 
-  {
-    for(int i=0;i<4;i++)
-    {
-        funct_checker_temp_arr[i]= expression[i];
-
-    }
-  
-    if (strncmp(funct_checker_temp_arr, MIN_array, 4) == 0) 
-    {
-        ans_funct.type = MIN_FUNCTION;
-        
-        Cell topLeft ;
-        Cell bottomRight ;
-    
-        if (!validateFormatAndExtractRange(expression, &topLeft, &bottomRight, success)) {
-            return ans_funct;
-        }
-    
-        ans_funct.data.rangeFunctions.topLeft = topLeft;
-        ans_funct.data.rangeFunctions.bottomRight = bottomRight;
-        *success = true;
-        return ans_funct;
-
-    } 
-
-    else if (strncmp(funct_checker_temp_arr, MAX_array, 4) == 0) 
-    {
-        
-        ans_funct.type = MAX_FUNCTION;
-        *success = true;
-        
-        Cell topLeft, bottomRight;
-        
-        if (!validateFormatAndExtractRange(expression, &topLeft, &bottomRight, success)) {
-            *success = false;
-            return ans_funct;
-        }
-
-        //debug
-        //printf("topLeft: %d %d\n", topLeft.col, topLeft.row);
-        //printf("bottomRight: %d %d\n", bottomRight.col, bottomRight.row);
-
-        ans_funct.data.rangeFunctions.topLeft = topLeft;
-        ans_funct.data.rangeFunctions.bottomRight = bottomRight;
-        *success = true;
-        return ans_funct;
-    } 
-
-    else if (strncmp(funct_checker_temp_arr, AVG_array, 4) == 0) 
-    {
-        ans_funct.type = AVG_FUNCTION;
-        
-        Cell topLeft, bottomRight;
-        
-        if (!validateFormatAndExtractRange(expression, &topLeft, &bottomRight, success)) {
-            *success = false;
-            return ans_funct;
-        }
-
-        ans_funct.data.rangeFunctions.topLeft = topLeft;
-        ans_funct.data.rangeFunctions.bottomRight = bottomRight;
-        *success = true;
-        return ans_funct;
-    } 
-    else if (strncmp(funct_checker_temp_arr, SUM_array, 4) == 0) 
-    {
-        ans_funct.type = SUM_FUNCTION;
-        
-        Cell topLeft, bottomRight;
-        
-        if (!validateFormatAndExtractRange(expression, &topLeft, &bottomRight, success)) {
-            *success = false;
-            return ans_funct;
-        }
-
-        ans_funct.data.rangeFunctions.topLeft = topLeft;
-        ans_funct.data.rangeFunctions.bottomRight = bottomRight;
-        *success = true;
-        return ans_funct;
-    } 
-    else if (strncmp(funct_checker_temp_arr, STDEV_array, 4) == 0) 
-    {
-        int length = strlen(expression);
-        if (expression[length - 1] != ')' || expression[4]!='V' || expression[5]!='(') 
-        {   
-            *success = false;
-            return ans_funct;
-        }
-        ans_funct.type = STDEV_FUNCTION;
-        char *start_pointer = expression + 6;
-        int i = 0;
-        char *bottom_right_pointer = NULL;
-        Cell topLeft, bottomRight;
-
-        while (start_pointer[i] != ')') 
-        {
-            if (start_pointer[i] == ':') 
-            {
-                bottom_right_pointer = start_pointer + i + 1;
-            }
-            i++;
-        }
-
-        *success = !(hasExtraCharsAfterClosingParen(expression));
-        if(!*success)
-        {
-            return ans_funct;
-        }
-
-        if (bottom_right_pointer) 
-        {
-            char top_left_reference[i + 1];
-            strncpy(top_left_reference, start_pointer, i);
-            top_left_reference[i] = '\0';
-
-            char *bottom_right_reference = bottom_right_pointer;
-            topLeft = parseCellReference(top_left_reference, success);
-            if(!(*success))
-            {
-                return ans_funct;
-            }
-
-            bottomRight = parseCellReference(bottom_right_reference, success);
-            if(!(*success))
-            {
-                return ans_funct;
-            }
-
-            ans_funct.data.rangeFunctions.topLeft = topLeft;
-            ans_funct.data.rangeFunctions.bottomRight = bottomRight;
-        }
-    } 
-    else if (strncmp(funct_checker_temp_arr, SLEEP_array, 4) == 0) 
-    {
-        if (expression[length - 1] != ')' || expression[4]!='V' || expression[5]!='(') 
-        {   
-            *success = false;
-            return ans_funct;
-        }
-
-        *success = !(hasExtraCharsAfterClosingParen(expression));
-        if(!*success)
-        {
-            return ans_funct;
-        }
-
-        ans_funct.type = SLEEP_FUNCTION;
-        int val = 0; 
-        int i = 6;
-
-        while(expression[i]<= '9'&& expression[i]>='0')
-        {
-            val = 10*val + expression[i]-'0';
-        }
-        ans_funct.data.value = val;
-    }
-
-    //above this line is cases for parenthesis functions, below this for other types
-
-    else 
-    {   
-        char* operand_address;
-        bool isBinaryOp = false;
-        int pos = 0;
-        
-        for (int i = 1; i < length; i++) 
-        {
-            if (expression[i] == '+' || expression[i] == '-' || 
-                expression[i] == '*' || expression[i] == '/') 
-            {
-                operand_address = expression + i + 1;  // Points to the part of the string after the operator
-                isBinaryOp = true;
-                switch (expression[i])
-                {
-                case '+':
-                    ans_funct.type = PLUS_OP;
-                    break;
-                
-                case '-':   
-                    ans_funct.type = MINUS_OP;
-                    break;
-
-                case '*':
-                    ans_funct.type = MULTIPLY_OP;
-                    break;  
-
-                case '/':       
-                    ans_funct.type = DIVIDE_OP;
-                    break;  
-
-                default:
-                    break;
-                }
-
-                pos = i; 
-                break;
-            }
-        }
-
-        if (isBinaryOp)  // If it is a binary operation
-        {
-            // Create operand1 
-            char operand1[pos + 1]; 
-            strncpy(operand1, expression, pos); 
-            operand1[pos] = '\0';  // Null-terminate operand1
-
-            // Create operand2 (after the operator)
-            char operand2[length - (operand_address - expression) + 1];  // Allocate space for operand2
-            strcpy(operand2, operand_address);  // Copy the part after the operator
-            
-            //first check if succcess is true then only assign otherwise error 
-            parseBinaryOp(operand1, operand2, success);
-            if(!(*success))
-            {
-                return ans_funct;
-            }
-            ans_funct.data.binaryOps = parseBinaryOp(operand1, operand2, success);
-        }
-
-        else //not a binaryop means that it could either be a constant or a cell reference
-        {
-            if(expression[0]-'0'<=9 && expression[0]-'0'>=0) // first char is a number implies that it is a constant
-            {
-                ans_funct.type = CONSTANT;
-                ans_funct.data.value = convert_to_int(expression); 
-                if(ans_funct.data.value == -1)
-                {
-                    *success = false;
-                    return ans_funct;
-                }
-            }
-
-            else // parse cell reference
-            {
-                ans_funct.type = SUM_FUNCTION;
-                char temp[2] = "0";
-                parseBinaryOp(expression, temp, success);
-                if(!(*success))
-                {
-                    return ans_funct;
-                }
-                ans_funct.data.binaryOps = parseBinaryOp(expression, temp, success);
-                
-            }
-        }
-    }  
-
+      Function fn;
+      if (op.type == OPERAND_INT) {
+          fn.type = CONSTANT;
+          fn.data.value = op.data.value;
+      } else {
+          fn.type = PLUS_OP;
+          fn.data.binaryOps.first.type = OPERAND_CELL;
+          fn.data.binaryOps.first.data.cell = op.data.cell;
+          fn.data.binaryOps.second.type = OPERAND_INT;
+          fn.data.binaryOps.second.data.value = 0;
+      }
+      return fn;
   }
 
-
-  else  // Expression is less than 4 characters long
-{
-    char* operand_address;
-    bool isBinaryOp = false;
-    int pos = 0;  // Position of operator in the expression
-
-    for (int i = 1; i < length; i++) 
-    {
-        if (expression[i] == '+' || expression[i] == '-' || 
-            expression[i] == '*' || expression[i] == '/') 
-        {
-            operand_address = expression + i + 1;  // Points to the part of the string after the operator
-            isBinaryOp = true;
-            switch (expression[i])
-                {
-                case '+':
-                    ans_funct.type = PLUS_OP;
-                    /* code */
-                    break;
-                
-                case '-':   
-                    ans_funct.type = MINUS_OP;
-                    break;
-
-                case '*':
-                    ans_funct.type = MULTIPLY_OP;
-                    break;  
-
-                case '/':       
-                    ans_funct.type = DIVIDE_OP;
-                    break;  
-
-                default:
-                    break;
-                }
-            pos = i; 
-            break;
-        }
-    }
-
-    if (isBinaryOp)  // If it is a binary operation
-    {
-        // Create operand1 
-        char operand1[pos + 1]; 
-        strncpy(operand1, expression, pos); 
-        operand1[pos] = '\0';  // Null-terminate operand1
-
-        // Create operand2 (after the operator)
-        char operand2[length - (operand_address - expression) + 1];  // Allocate space for operand2
-        strcpy(operand2, operand_address);  // Copy the part after the operator
-
-        parseBinaryOp(operand1, operand2, success);
-        if(!(*success))
-        {
-            return ans_funct;
-        }
-        ans_funct.data.binaryOps = parseBinaryOp(operand1, operand2, success);
-    }
-    else 
-    {
-        if (expression[0] >= '0' && expression[0] <= '9')  // If the first character is a number its a constant
-        {
-            ans_funct.type = CONSTANT;
-            ans_funct.data.value = convert_to_int(expression);  // Convert string to integer
-            if(ans_funct.data.value == -1)
-            {
-                *success = false;
-                return ans_funct;
-            }
-        }
-        else  // If it's not a number its a cell reference 
-        {
-            ans_funct.type = SUM_FUNCTION;  // Default to SUM_FUNCTION
-            char temp[2] = "0";
-            parseBinaryOp(expression, temp, success);
-            if(!(*success))
-            {
-                return ans_funct;
-            }
-            ans_funct.data.binaryOps = parseBinaryOp(expression, temp, success); 
-        }
-    }
-  }
-
-  
-  return ans_funct;
-    
+  //binary operation
+    return parseBinaryOp(expression, &expression[nextStart], success);
 }
-
